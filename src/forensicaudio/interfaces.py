@@ -36,7 +36,11 @@ class ASRBackend(Protocol):
         n_best: int = 5,
     ) -> list[SegmentHypotheses]:
         """Return hypotheses per segment. Every SegmentHypotheses must carry
-        audio_provenance and every Alternative its origin."""
+        audio_provenance and every Alternative its origin.
+
+        audio_provenance describes the AUDIO passed in, not the text: the
+        default input is the original (deterministic) audio. Backends accept
+        an optional `audio_provenance=` keyword to declare otherwise."""
         ...
 
 

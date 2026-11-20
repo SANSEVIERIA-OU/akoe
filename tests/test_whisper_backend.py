@@ -57,7 +57,7 @@ def test_transcribe_keeps_all_candidates_with_origin_and_provenance(tiny, noise)
     segs = tiny.transcribe(noise, SR, segments=[(0.5, 2.0), (2.0, 3.0)], n_best=3)
     assert [(s.start, s.end) for s in segs] == [(0.5, 2.0), (2.0, 3.0)]
     for s in segs:
-        assert s.audio_provenance == StageKind.NEURAL
+        assert s.audio_provenance == StageKind.DETERMINISTIC  # default input: original audio
         origins = {h.origin for h in s.hypotheses}
         assert origins <= {"tiny-whisper/generic", "tiny-whisper/generic/sampling"}
         assert "tiny-whisper/generic" in origins

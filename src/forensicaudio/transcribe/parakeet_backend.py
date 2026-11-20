@@ -97,7 +97,7 @@ class ParakeetTDTBackend:
         confidence: EntropyConfidence | None = None,
         beam_size: int = 4,
         local_files_only: bool = False,
-        audio_provenance: StageKind = StageKind.NEURAL,
+        audio_provenance: StageKind = StageKind.DETERMINISTIC,
     ) -> None:
         self.model_id = model_id
         self.revision = revision if revision is not None else KNOWN_REVISIONS.get(model_id)

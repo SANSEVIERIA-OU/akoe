@@ -58,7 +58,7 @@ def test_hypotheses_words_and_confidence_from_nemo_output():
     be = _with_fake([0.9, 0.5, 0.2])
     segs = be.transcribe(np.zeros(SR * 2, dtype=np.float32), SR, segments=[(1.0, 2.0)], n_best=1)
     s = segs[0]
-    assert s.audio_provenance == StageKind.NEURAL
+    assert s.audio_provenance == StageKind.DETERMINISTIC  # default input: original audio
     assert [(h.text, h.score, h.origin) for h in s.hypotheses] == [("buongiorno a tutti", -1.5, be.name)]
     assert [w.text for w in s.words] == ["buongiorno", "a", "tutti"]
     assert [w.confidence for w in s.words] == [0.9, 0.5, 0.2]

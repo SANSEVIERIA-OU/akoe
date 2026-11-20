@@ -221,7 +221,7 @@ class WhisperHFBackend:
         word_timestamps: bool = True,
         max_new_tokens: int = 200,
         local_files_only: bool = False,
-        audio_provenance: StageKind = StageKind.NEURAL,
+        audio_provenance: StageKind = StageKind.DETERMINISTIC,
         allow_base_mismatch: bool = False,
     ) -> None:
         self.model_id = model_id
