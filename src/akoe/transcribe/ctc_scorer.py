@@ -2,7 +2,8 @@
 """CTC forced-alignment scorer for "did he say X or Y?" (`CandidateScorer`).
 
 Each operator-typed candidate is force-aligned to the emissions of an Italian
-CTC model (wav2vec2 / XLS-R) with a Viterbi pass over the CTC trellis,
+CTC model (wav2vec2 / XLS-R; default XLS-R 1B Italian, issue #58) with a
+Viterbi pass over the CTC trellis,
 implemented here in numpy. Why not torchaudio: `torchaudio.functional.forced_align`
 was announced as deprecated in 2.8 and slated for removal in 2.9; torchaudio
 2.11.1 (installed here) still ships it and it works, but depending on it would
@@ -43,16 +44,22 @@ from akoe.neural import (
     resolve_hf_snapshot,
 )
 
-# Default Italian CTC model: XLS-R 53 fine-tuned on Common Voice 6.1 Italian.
-# Licence apache-2.0 on the model card, verified 2026-11-20 at this revision.
-DEFAULT_CTC_MODEL = "jonatasgrosman/wav2vec2-large-xlsr-53-italian"
+# Default Italian character-level CTC model (issue #58): XLS-R 1B fine-tuned on
+# Common Voice 8 Italian (model card: CV8 test WER 9.04, CER 2.20). Licence
+# apache-2.0 on the model card, verified 2026-11-20 at this revision (weights:
+# pytorch_model.bin only, loaded by transformers with weights_only=True).
+DEFAULT_CTC_MODEL = "jonatasgrosman/wav2vec2-xls-r-1b-italian"
+# Previous default (XLS-R 53, Common Voice 6.1 Italian), kept for comparison.
+XLSR53_ITALIAN = "jonatasgrosman/wav2vec2-large-xlsr-53-italian"
 KNOWN_REVISIONS = {
-    DEFAULT_CTC_MODEL: "dab04a3e00d8326052f3fb22a6ff276b822f6131",
+    DEFAULT_CTC_MODEL: "02d4be265ac946dc9d2bbbd15d2219b11fbb12c2",
+    XLSR53_ITALIAN: "dab04a3e00d8326052f3fb22a6ff276b822f6131",
     # Small model for tests only: licence cc-by-nc-4.0 (non-commercial).
     "facebook/wav2vec2-base-10k-voxpopuli-ft-it": "653b3c789c7d83134924bda6fabe0c6bb84f579c",
 }
 KNOWN_LICENSES = {
     DEFAULT_CTC_MODEL: "apache-2.0",
+    XLSR53_ITALIAN: "apache-2.0",
     "facebook/wav2vec2-base-10k-voxpopuli-ft-it": "cc-by-nc-4.0",
 }
 MAX_SECONDS = 60.0
@@ -183,6 +190,8 @@ class CTCCandidateScore:
 
 class CTCForcedAlignmentScorer:
     """Scores candidate phrases with an Italian CTC model (lazy-loaded)."""
+
+    max_seconds: float = MAX_SECONDS  # longest audio accepted by `emissions()`
 
     def __init__(
         self,
@@ -325,10 +334,10 @@ class CTCForcedAlignmentScorer:
         if self._emit is None:
             self.load()
         a = prepare_audio(audio, sr)
-        if len(a) > MAX_SECONDS * TARGET_SR:
+        if len(a) > self.max_seconds * TARGET_SR:
             raise ValueError(
                 f"Tratto troppo lungo per il confronto tra frasi candidate ({len(a) / TARGET_SR:.1f} s; "
-                f"massimo {MAX_SECONDS:.0f} s). Selezionare un tratto più breve."
+                f"massimo {self.max_seconds:.0f} s). Selezionare un tratto più breve."
             )
         return self._emit(a), len(a)
 

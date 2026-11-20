@@ -8,13 +8,17 @@
   record next to each profile lists the items, parameters and warnings.
 - `ProfileScorer`: cosine similarity of a segment's embedding with the
   closest condition centroid. Every score states the condition it refers to
-  (MASTER_PLAN §3.5.3, §4.2).
+  (MASTER_PLAN §3.5.3, §4.2). When the calibration carries a score
+  normalization (issue #57: mean subtraction, AS-norm, QMF; `score_norm.py`),
+  the score is the normalized one the calibration was fitted on.
 - `calibrate_scores`: logistic regression on case material (subject segments
   vs other speakers) and a calibrated threshold below which a segment is
   flagged "possibile altro parlante". The scores come from
   `loro_calibration_scores` (leave-one-recording-out on training material,
   issue #49), so the self-assessment holdout never enters the calibration;
-  `calibration_scores` (holdout by default) is kept for compatibility.
+  with a `ScoringRecipe` the LORO scores are normalized first (the cohort of
+  each fold excludes the left-out recording group). `calibration_scores`
+  (holdout by default) is kept for compatibility.
 
 The voiceprint is a similarity score for triage, selection and warnings. It
 is never an attribution of the voice to a person (CLAUDE.md invariant 6):
@@ -51,6 +55,14 @@ from akoe.speaker._io import (
     write_content_addressed,
 )
 from akoe.speaker.dataset import DatasetError, SubjectDataset
+from akoe.speaker.score_norm import (
+    CohortEntry,
+    NormScore,
+    ScoreNormalization,
+    ScoreNormalizer,
+    ScoringRecipe,
+    fit_qmf,
+)
 from akoe.speaker.timbre import TimbreParams, TimbreSource, compute_timbre
 
 # Embeddings come from fixed weights: deterministic given the backend.
@@ -330,6 +342,10 @@ class ScoreCalibration(BaseModel):
     # EER measured later on the same holdout optimistic.
     scheme: str = "unspecified"
     holdout_used: bool | None = None
+    # Score the calibration was fitted on (issue #57): "cosine" (plain), or the
+    # normalized "asnorm" / "qmf" score defined by the `normalization` artifact.
+    score_kind: str = "cosine"
+    normalization: ArtifactRef | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -354,11 +370,16 @@ def calibrate_scores(
     min_per_class: int = 10,
     scheme: str = "unspecified",
     holdout_used: bool | None = None,
+    normalization: ArtifactRef | None = None,
+    score_kind: str = "cosine",
 ) -> ScoreCalibration:
     """Fit P(subject | score) with scikit-learn's LogisticRegression on standardized scores.
 
     `scheme` / `holdout_used` record where the scores come from (see
     `loro_calibration_scores`); a calibration on holdout material gets a warning.
+    `normalization` / `score_kind` record the score normalization (issue #57)
+    that produced the scores, so that `ProfileScorer` scores new segments the
+    same way.
     """
     if len(same) < 2 or len(other) < 2:
         raise DatasetError(
@@ -421,10 +442,12 @@ def calibrate_scores(
         eer=eer,
         eer_threshold=eer_t,
         params={"C": C, "class_weight": "balanced", "solver": "lbfgs", "max_iter": 1000,
-                "features": "standardized similarity score"},
+                "features": f"standardized similarity score ({score_kind})"},
         warnings=warnings,
         scheme=scheme,
         holdout_used=holdout_used,
+        score_kind=score_kind,
+        normalization=normalization,
     )
 
 
@@ -439,6 +462,17 @@ def load_calibration(case: Case, ref: ArtifactRef) -> ScoreCalibration:
     return ScoreCalibration.model_validate(read_verified_json(case, ref))
 
 
+def save_normalization(case: Case, normalization: ScoreNormalization) -> ArtifactRef:
+    return write_content_addressed(
+        case, subject_dir(case, normalization.subject_id) / "calibration", "score-normalization",
+        normalization.model_dump(mode="json", by_alias=True), kind="score_normalization",
+    )
+
+
+def load_normalization(case: Case, ref: ArtifactRef) -> ScoreNormalization:
+    return ScoreNormalization.model_validate(read_verified_json(case, ref))
+
+
 # --------------------------------------------------------------------------
 # Scoring
 # --------------------------------------------------------------------------
@@ -448,7 +482,7 @@ class SegmentScore(BaseModel):
     """Similarity of one segment with the subject profile. Always states the
     reference condition; it is a score, not an attribution."""
 
-    score: float  # cosine similarity with the closest condition centroid
+    score: float  # cosine with the closest condition centroid, or the normalized score (score_kind)
     condition_key: str  # condition the score refers to
     scores_by_condition: dict[str, float]
     calibrated_probability: float | None = None
@@ -456,6 +490,8 @@ class SegmentScore(BaseModel):
     backend: str
     profile_version: int
     message: str
+    score_kind: str = "cosine"  # "cosine" | "asnorm" | "qmf" (issue #57)
+    cosine: float | None = None  # cosine after mean subtraction, when the score is normalized
 
 
 class ProfileScorer:
@@ -466,6 +502,7 @@ class ProfileScorer:
         backend: VoiceprintBackend,
         calibration: ScoreCalibration | None = None,
         analysis_sr: int = 16000,
+        normalizer: ScoreNormalizer | None = None,
     ) -> None:
         if not centroids:
             raise DatasetError("Il profilo non contiene impronte vocali utilizzabili")
@@ -474,11 +511,16 @@ class ProfileScorer:
                 f"Calibrazione fatta con '{calibration.backend}', modello attuale '{backend.name}': "
                 "punteggi non confrontabili"
             )
+        if calibration is not None and calibration.normalization is not None and normalizer is None:
+            raise DatasetError(
+                "La calibrazione usa punteggi normalizzati: caricare il valutatore con ProfileScorer.load"
+            )
         self.profile = profile
         self.centroids = {k: c for k, c in sorted(centroids.items())}
         self.backend = backend
         self.calibration = calibration
         self.analysis_sr = analysis_sr
+        self.normalizer = normalizer
 
     @classmethod
     def load(
@@ -502,26 +544,50 @@ class ProfileScorer:
                 )
             centroids[data["condition_key"]] = np.asarray(data["centroid"], dtype=np.float64)
             sr = int(data.get("analysis_sr", sr))
-        return cls(profile, centroids, backend, calibration, analysis_sr=sr)
+        normalizer = None
+        if calibration is not None and calibration.normalization is not None:
+            norm = load_normalization(case, calibration.normalization)
+            if norm.backend != backend.name:
+                raise DatasetError(
+                    f"Normalizzazione dei punteggi calcolata con '{norm.backend}', modello attuale "
+                    f"'{backend.name}': punteggi non confrontabili"
+                )
+            normalizer = ScoreNormalizer.from_artifact(norm)
+        return cls(profile, centroids, backend, calibration, analysis_sr=sr, normalizer=normalizer)
 
     def with_calibration(self, calibration: ScoreCalibration) -> "ProfileScorer":
-        return ProfileScorer(self.profile, self.centroids, self.backend, calibration, self.analysis_sr)
+        same = self.calibration is not None and calibration.normalization == self.calibration.normalization
+        normalizer = self.normalizer if calibration.normalization is not None and same else None
+        return ProfileScorer(self.profile, self.centroids, self.backend, calibration, self.analysis_sr,
+                             normalizer=normalizer)
 
     def embed(self, audio: np.ndarray, sr: int) -> np.ndarray | None:
         return _unit(self.backend.embed(audio, sr))
 
-    def score_embedding(self, embedding: np.ndarray, condition_key: str | None = None) -> SegmentScore:
+    def score_embedding(self, embedding: np.ndarray, condition_key: str | None = None,
+                        duration: float | None = None) -> SegmentScore:
+        """Score against the profile; `duration` (seconds) feeds the QMF quality
+        measures when the calibration uses them."""
         v = _unit(embedding)
         if v is None:
             raise ValueError("embedding is zero or not finite")
         if condition_key is not None and condition_key not in self.centroids:
             raise DatasetError(f"Condizione {condition_key} assente dal profilo")
-        scores = {k: float(np.dot(v, c)) for k, c in self.centroids.items()}
-        candidates = {condition_key: scores[condition_key]} if condition_key else scores
-        best_key = max(sorted(candidates), key=lambda k: candidates[k])
-        best = scores[best_key]
+        kind, cosine = "cosine", None
+        if self.normalizer is not None:
+            if condition_key is not None and condition_key not in self.normalizer.centroids:
+                raise DatasetError(f"Condizione {condition_key} assente dalla normalizzazione dei punteggi")
+            ns = self.normalizer.score(v, duration, condition_key)
+            scores, best_key, best, kind, cosine = ns.by_condition, ns.condition_key, ns.score, ns.kind, ns.cosine
+            msg = (f"Punteggio normalizzato ({kind}) {best:.3f} rispetto alla condizione {best_key} "
+                   f"(coseno dopo sottrazione della media {cosine:.3f}).")
+        else:
+            scores = {k: float(np.dot(v, c)) for k, c in self.centroids.items()}
+            candidates = {condition_key: scores[condition_key]} if condition_key else scores
+            best_key = max(sorted(candidates), key=lambda k: candidates[k])
+            best = scores[best_key]
+            msg = f"Somiglianza {best:.3f} rispetto alla condizione {best_key}."
         prob = flag = None
-        msg = f"Somiglianza {best:.3f} rispetto alla condizione {best_key}."
         if self.calibration is not None:
             prob = self.calibration.probability(best)
             flag = self.calibration.is_possible_other_speaker(best)
@@ -538,14 +604,14 @@ class ProfileScorer:
             score=best, condition_key=best_key, scores_by_condition=scores,
             calibrated_probability=prob, possible_other_speaker=flag,
             backend=self.backend.name, profile_version=self.profile.version,
-            message=f"{msg} {SCORE_NOTE}",
+            message=f"{msg} {SCORE_NOTE}", score_kind=kind, cosine=cosine,
         )
 
     def score(self, audio: np.ndarray, sr: int, condition_key: str | None = None) -> SegmentScore:
         v = self.embed(audio, sr)
         if v is None:
             raise ValueError("backend returned a zero or non-finite embedding")
-        return self.score_embedding(v, condition_key)
+        return self.score_embedding(v, condition_key, duration=len(audio) / sr)
 
 
 def annotate_segment(segment: SegmentHypotheses, score: SegmentScore) -> SegmentHypotheses:
@@ -587,18 +653,18 @@ def calibration_scores(
             continue
         v = scorer.embed(audio.segment(it.recording_id, it.start, it.end), sr)
         if v is not None:
-            same.append(scorer.score_embedding(v).score)
+            same.append(scorer.score_embedding(v, duration=it.end - it.start).score)
     other: list[float] = []
     for span in dataset.other_speaker_spans:
         if span.end - span.start < min_seconds:
             continue
         v = scorer.embed(audio.segment(span.recording_id, span.start, span.end), sr)
         if v is not None:
-            other.append(scorer.score_embedding(v).score)
+            other.append(scorer.score_embedding(v, duration=span.end - span.start).score)
     for a, a_sr in extra_other:
         v = scorer.embed(np.asarray(a, dtype=np.float32), a_sr)
         if v is not None:
-            other.append(scorer.score_embedding(v).score)
+            other.append(scorer.score_embedding(v, duration=len(a) / a_sr).score)
     material = json.dumps(
         {
             "subject_segments": f"items in splits {[s.value for s in splits]}",
@@ -621,6 +687,10 @@ class LOROScores(BaseModel):
     other: list[float]
     material: dict[str, Any]
     warnings: list[str] = Field(default_factory=list)  # Italian
+    # With a ScoringRecipe (issue #57): the fitted normalization for new segments
+    # and the kind of the scores above ("cosine", "asnorm" or "qmf").
+    normalization: ScoreNormalization | None = None
+    score_kind: str = "cosine"
 
     def material_json(self) -> str:
         return json.dumps(self.material, sort_keys=True)
@@ -656,6 +726,8 @@ def loro_calibration_scores(
     analysis_sr: int = 16000,
     min_seconds: float = 0.5,
     extra_other: Sequence[tuple[np.ndarray, int]] = (),
+    recipe: ScoringRecipe | None = None,
+    cohort_audio: Sequence[tuple[np.ndarray, int, str]] = (),
 ) -> LOROScores:
     """Leave-one-recording-out scores on TRAINING material only (issue #49).
 
@@ -669,6 +741,16 @@ def loro_calibration_scores(
     speakers outside the case recordings) are scored against the centroids
     of all training items.
 
+    With a `recipe` (issue #57) the scores are normalized (`score_norm.py`):
+    the impostor cohort is made of the sources in `recipe.cohort_sources` -
+    other-speaker spans of the training recordings, the `extra_other` clips
+    and the cohort-only `cohort_audio` clips `(audio, sr, label)`. In each
+    fold the mean, the cohort and the centroids exclude the left-out group (an
+    extra clip is left out of the cohort when it is scored), so no segment is
+    normalized against itself. QMF, if enabled and with enough trials, is
+    fitted on all the fold trials; the returned `normalization` (fitted on all
+    training items and the whole cohort) scores new segments the same way.
+
     `items` defaults to the items eligible for the profile (verified, train,
     aligned, without blocking errors); any non-train item is refused.
     """
@@ -679,16 +761,17 @@ def loro_calibration_scores(
     warnings: list[str] = []
     audio = _AudioCache(case, dataset, analysis_sr)
 
-    subj: list[tuple[str, str, np.ndarray]] = []  # (group, condition key, unit embedding)
+    subj: list[tuple[str, str, np.ndarray, float, str]] = []  # (group, condition, unit emb., seconds, item)
     for it in sorted(items, key=lambda it: it.item_id):
         if it.end - it.start < min_seconds:
             continue
         v = _unit(backend.embed(audio.segment(it.recording_id, it.start, it.end), analysis_sr))
         if v is not None:
-            subj.append((_recording_group(dataset, it.recording_id), it.condition.key(), v))
+            subj.append((_recording_group(dataset, it.recording_id), it.condition.key(), v,
+                         it.end - it.start, it.item_id))
     train_recs = {r.recording_id for r in dataset.recordings if r.split == DatasetSplit.TRAIN}
     holdout_recs = {r.recording_id for r in dataset.recordings if r.split == DatasetSplit.HOLDOUT}
-    oth: list[tuple[str, np.ndarray]] = []
+    oth: list[tuple[str, np.ndarray, float]] = []
     n_holdout_spans = 0
     for span in dataset.other_speaker_spans:
         if span.recording_id not in train_recs:
@@ -698,32 +781,103 @@ def loro_calibration_scores(
             continue
         v = _unit(backend.embed(audio.segment(span.recording_id, span.start, span.end), analysis_sr))
         if v is not None:
-            oth.append((_recording_group(dataset, span.recording_id), v))
+            oth.append((_recording_group(dataset, span.recording_id), v, span.end - span.start))
 
-    groups = sorted({g for g, _, _ in subj} | {g for g, _ in oth})
+    groups = sorted({s[0] for s in subj} | {g for g, _, _ in oth})
     same: list[float] = []
     other: list[float] = []
     skipped: list[str] = []
-    for g in groups:
-        cents = _centroids([(k, v) for gg, k, v in subj if gg != g])
-        if not cents:
-            skipped.append(g)
-            continue
-        same += [_best(v, cents) for gg, _, v in subj if gg == g]
-        other += [_best(v, cents) for gg, v in oth if gg == g]
-    if skipped:
-        warnings.append(
-            f"{len(skipped)} gruppi di registrazioni esclusi dalla calibrazione: senza altre registrazioni "
-            "di addestramento non si può costruire l'impronta che li esclude"
-        )
-    full = _centroids([(k, v) for _, k, v in subj])
-    n_extra = 0
-    if full:
+    normalization: ScoreNormalization | None = None
+    score_kind = "cosine"
+    recipe_info: dict[str, Any] | None = None
+    full = _centroids([(k, v) for _, k, v, _, _ in subj])
+    extra: list[tuple[np.ndarray, float]] = []
+    if full or recipe is not None:
         for a, a_sr in extra_other:
             v = _unit(backend.embed(np.asarray(a, dtype=np.float32), a_sr))
             if v is not None:
-                other.append(_best(v, full))
+                extra.append((v, len(a) / a_sr))
+    if recipe is None:
+        for g in groups:
+            cents = _centroids([(k, v) for gg, k, v, _, _ in subj if gg != g])
+            if not cents:
+                skipped.append(g)
+                continue
+            same += [_best(v, cents) for gg, _, v, _, _ in subj if gg == g]
+            other += [_best(v, cents) for gg, v, _ in oth if gg == g]
+        if full:
+            other += [_best(v, full) for v, _ in extra]
+        n_extra = len(extra) if full else 0
+    else:
+        cohort: list[CohortEntry] = []
+        if "case_other_speakers" in recipe.cohort_sources:
+            cohort += [CohortEntry(v, g, "case_other_speakers", d) for g, v, d in oth]
+        if "extra_other" in recipe.cohort_sources:
+            cohort += [CohortEntry(v, f"extra:{i}", "extra_other", d) for i, (v, d) in enumerate(extra)]
+        if "cohort_files" in recipe.cohort_sources:
+            for i, (a, a_sr, label) in enumerate(cohort_audio):
+                v = _unit(backend.embed(np.asarray(a, dtype=np.float32), a_sr))
+                if v is not None:
+                    cohort.append(CohortEntry(v, f"cohort:{i}", "cohort_files", len(a) / a_sr, label))
+        use_mean = recipe.mean_subtraction and len(cohort) >= recipe.min_cohort
+        use_asn = recipe.as_norm and len(cohort) >= recipe.min_cohort
+        if (recipe.mean_subtraction or recipe.as_norm) and not (use_mean or use_asn):
+            warnings.append(
+                f"Coorte di altri parlanti troppo piccola ({len(cohort)}; servono almeno {recipe.min_cohort}): "
+                "punteggi senza sottrazione della media e senza AS-norm"
+            )
+
+        def fit(subject_rows: list, cohort_rows: list[CohortEntry]) -> ScoreNormalizer | None:
+            return ScoreNormalizer.fit(recipe, [(k, v, d) for _, k, v, d, _ in subject_rows], cohort_rows,
+                                       use_mean=use_mean, use_as_norm=use_asn)
+
+        trials: list[tuple[int, NormScore]] = []
+        for g in groups:
+            norm = fit([s for s in subj if s[0] != g], [c for c in cohort if c.group != g])
+            if norm is None:
+                skipped.append(g)
+                continue
+            trials += [(1, norm.score(v, d)) for gg, _, v, d, _ in subj if gg == g]
+            trials += [(0, norm.score(v, d)) for gg, v, d in oth if gg == g]
+        n_extra = 0
+        for i, (v, d) in enumerate(extra):
+            norm = fit(subj, [c for c in cohort if c.group != f"extra:{i}"])
+            if norm is not None:
+                trials.append((0, norm.score(v, d)))
                 n_extra += 1
+        qmf, note = fit_qmf(recipe, trials) if trials else (None, None)
+        if note:
+            warnings.append(note)
+        if qmf is not None:
+            scores = [(lab, qmf.decision(ns.features)) for lab, ns in trials]
+        else:
+            scores = [(lab, ns.score) for lab, ns in trials]
+        same = [s for lab, s in scores if lab == 1]
+        other = [s for lab, s in scores if lab == 0]
+        final = fit(subj, cohort)
+        if final is not None:
+            final.qmf = qmf
+            n_sources = {src: sum(1 for c in cohort if c.source == src) for src in recipe.cohort_sources}
+            recipe_info = {
+                "recipe": recipe.model_dump(mode="json"), "steps": final.steps,
+                "cohort_size": len(cohort), "cohort_by_source": n_sources,
+                "effective_top_k": None if final.cohort is None else min(recipe.top_k, final.cohort.shape[0]),
+                "qmf": None if qmf is None else qmf.model_dump(mode="json"),
+                "fold_exclusion": "mean, cohort and centroids of each fold exclude the left-out recording "
+                                  "group; an extra clip is excluded from the cohort when scored",
+            }
+            normalization = final.to_artifact(
+                backend=backend.name, subject_id=dataset.subject_id, cohort=cohort,
+                subject_items=[s[4] for s in subj], warnings=warnings, material=recipe_info,
+            )
+            score_kind = normalization.score_kind
+            if not normalization.steps:
+                normalization, score_kind = None, "cosine"  # nothing applied: plain cosine, as before
+    if skipped:
+        warnings.append(
+            f"{len(skipped)} gruppi di registrazioni esclusi dalla calibrazione: senza altre registrazioni "
+            "di addestramento (o senza una coorte che li escluda) non si può costruire l'impronta che li esclude"
+        )
     if n_holdout_spans:
         warnings.append(
             f"{n_holdout_spans} tratti di altri parlanti nelle registrazioni di autovalutazione non usati "
@@ -745,4 +899,8 @@ def loro_calibration_scores(
         "analysis_sr": analysis_sr,
         "backend": backend.name,
     }
-    return LOROScores(same=same, other=other, material=material, warnings=warnings)
+    if recipe is not None:
+        material["score_kind"] = score_kind
+        material["score_normalization"] = recipe_info
+    return LOROScores(same=same, other=other, material=material, warnings=warnings,
+                      normalization=normalization, score_kind=score_kind)

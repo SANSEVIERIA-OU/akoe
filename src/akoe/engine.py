@@ -365,13 +365,33 @@ def parse_asr_ensemble(value: str | Sequence[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(names))
 
 
+def default_candidate_ctc_model(tier: Tier) -> str:
+    """CTC model for "did he say X or Y?" (issue #58, docs/catalogo_modelli.md):
+    omniASR CTC 1B v2 on EDGE, 3B v2 on WORKSTATION/CLOUD. The 3B is used only
+    once the SHA-256 of its checkpoint is pinned in `omniasr_ctc` (it was not
+    downloaded on the development machine); until then the 1B, whose hash is
+    pinned, is used on every tier, and the model name in the processing log
+    says which one ran."""
+    from akoe.transcribe.omniasr_ctc import (
+        DEFAULT_OMNIASR_MODEL,
+        WORKSTATION_OMNIASR_MODEL,
+        weights_pinned,
+    )
+
+    if tier != Tier.EDGE and weights_pinned(WORKSTATION_OMNIASR_MODEL):
+        return WORKSTATION_OMNIASR_MODEL
+    return DEFAULT_OMNIASR_MODEL
+
+
 class DefaultBackends:
-    """Real models (lazy, cached per process): ReDimNet-B2 voiceprint, Italian
-    CTC model for alignment and candidate scoring, the ASR ensemble (Cohere
-    Transcribe, Qwen3-ASR, Parakeet-TDT when NeMo is installed, Whisper
-    generic / adapted, Nemotron on CLOUD), LoRA trainer, neural listening
-    enhancers and neural VADs (optional methods, looked up with ``getattr``
-    so that providers without them keep working).
+    """Real models (lazy, cached per process): ReDimNet2-B6 voiceprint (issue
+    #57); XLS-R 1B Italian for the character-level transcript alignment and
+    omniASR CTC v2 for candidate scoring, per tier (issue #58); the ASR
+    ensemble (Cohere Transcribe, Qwen3-ASR, Parakeet-TDT when NeMo is
+    installed, Whisper generic / adapted, Nemotron on CLOUD); LoRA trainer;
+    neural listening enhancers and neural VADs (optional methods, looked up
+    with ``getattr`` so that providers without them keep working).
+    `ctc_model`, when given, replaces both CTC models.
 
     `asr_ensemble` (or the AKOE_ASR_ENSEMBLE variable, comma-separated) selects
     the transcribers; default `default_asr_ensemble(tier)`. With `low_memory`
@@ -404,12 +424,23 @@ class DefaultBackends:
         return self._get(("voiceprint", self.voiceprint_name),
                          lambda: default_voiceprint_backend(self.voiceprint_name, device=self.device))
 
-    def ctc_scorer(self) -> Any:
-        from akoe.transcribe.ctc_scorer import DEFAULT_CTC_MODEL, CTCForcedAlignmentScorer
+    def _ctc(self, model: str) -> Any:
+        from akoe.transcribe.ctc_scorer import CTCForcedAlignmentScorer
+        from akoe.transcribe.omniasr_ctc import OmniASRCTCScorer, is_omniasr_model
 
-        model = self.ctc_model or DEFAULT_CTC_MODEL
-        return self._get(("ctc", model), lambda: CTCForcedAlignmentScorer(
+        cls = OmniASRCTCScorer if is_omniasr_model(model) else CTCForcedAlignmentScorer
+        return self._get(("ctc", model), lambda: cls(
             model, device=self.device, local_files_only=self.local_files_only))
+
+    def ctc_scorer(self) -> Any:
+        """Character-level CTC scorer of the transcript aligner (XLS-R 1B Italian)."""
+        from akoe.transcribe.ctc_scorer import DEFAULT_CTC_MODEL
+
+        return self._ctc(self.ctc_model or DEFAULT_CTC_MODEL)
+
+    def candidate_ctc_scorer(self, tier: Tier) -> Any:
+        """CTC scorer for candidate phrases (omniASR CTC v2, see `default_candidate_ctc_model`)."""
+        return self._ctc(self.ctc_model or default_candidate_ctc_model(tier))
 
     def aligner(self) -> TranscriptAligner:
         from akoe.transcribe.ctc_aligner import CTCTranscriptAligner
@@ -496,7 +527,7 @@ class DefaultBackends:
         from akoe.transcribe.whisper_backend import WhisperDecoderScorer
 
         model = whisper_model or self.whisper_model or default_whisper_model(tier)
-        return [self.ctc_scorer(), WhisperDecoderScorer(self.whisper(model))]
+        return [self.candidate_ctc_scorer(tier), WhisperDecoderScorer(self.whisper(model))]
 
     def trainer(self) -> Callable[..., Any]:
         from akoe.adapt.train import train_adapter
@@ -859,12 +890,20 @@ def build_subject_model(
     compute_timbre: bool = True,
     calibrate: bool = True,
     other_speaker_files: Sequence[Path] = (),
+    score_recipe: Any = "default",
+    cohort_files: Sequence[Path] = (),
     mode: Mode = Mode.FORENSIC,
     tier: Tier = Tier.EDGE,
     provider: BackendProvider | None = None,
     progress: ProgressFn | None = None,
 ) -> WorkflowResult:
     """Import the subject's recordings (reference role) and build his model.
+
+    Voiceprint scores are normalized with the WeSpeaker recipe before the
+    calibration (`speaker/score_norm.py`, issue #57): `score_recipe` is a
+    `ScoringRecipe` ("default" = `DEFAULT_SCORING_RECIPE`, None = plain cosine
+    as before); `cohort_files` are cohort-only clips of non-subject speakers
+    (e.g. a public Italian cohort), added to the other speakers of the case.
 
     Untimed transcriptions are aligned with the CTC aligner (spans below its
     threshold are flagged), recordings are split train/holdout by recording,
@@ -890,7 +929,17 @@ def build_subject_model(
         "review": review.reviewer if review is not None else None, "certify_all_by": certify_all_by,
         "compute_timbre": compute_timbre, "calibrate": calibrate,
         "other_speaker_files": [str(p) for p in other_speaker_files],
+        "cohort_files": [str(p) for p in cohort_files],
     }
+    from akoe.speaker.score_norm import DEFAULT_SCORING_RECIPE, ScoringRecipe
+
+    if isinstance(score_recipe, str):
+        if score_recipe != "default":
+            raise EngineError(f"Ricetta di punteggio sconosciuta: {score_recipe!r}")
+        score_recipe = DEFAULT_SCORING_RECIPE
+    elif score_recipe is not None and not isinstance(score_recipe, ScoringRecipe):
+        score_recipe = ScoringRecipe.model_validate(score_recipe)
+    params["score_recipe"] = score_recipe.model_dump(mode="json") if score_recipe is not None else None
     wl = WorkflowLog(case, "build_subject_model", mode=mode, tier=tier, parameters=params)
     ds = SubjectDataset.load_or_create(case, subject_id)
 
@@ -1011,17 +1060,31 @@ def build_subject_model(
             ref = _store_input(case, Path(p), "working/other_speakers", "other_speaker")
             wl.input(f"other_speaker:{ref.sha256[:12]}", ref)
             extra.append((load_audio(ref.resolve(case.root), TARGET_SR), TARGET_SR))
-        loro = sp.loro_calibration_scores(case, ds, vp, extra_other=extra)
+        cohort = []
+        for p in cohort_files:
+            ref = _store_input(case, Path(p), "working/score_cohort", "score_cohort")
+            wl.input(f"score_cohort:{ref.sha256[:12]}", ref)
+            cohort.append((load_audio(ref.resolve(case.root), TARGET_SR), TARGET_SR, f"sha256:{ref.sha256}"))
+        loro = sp.loro_calibration_scores(case, ds, vp, extra_other=extra, recipe=score_recipe,
+                                          cohort_audio=cohort)
         for w in loro.warnings:
             wl.note(w)
         if len(loro.same) >= 2 and len(loro.other) >= 2:
+            norm_ref = None
+            if loro.normalization is not None:
+                from akoe.speaker.profile import save_normalization
+
+                norm_ref = save_normalization(case, loro.normalization)
+                wl.register(norm_ref, "score_normalization")
             cal = sp.calibrate_scores(loro.same, loro.other, backend=vp.name, profile=upd.profile,
-                                      material=loro.material_json(), scheme=sp.LORO_SCHEME, holdout_used=False)
+                                      material=loro.material_json(), scheme=sp.LORO_SCHEME, holdout_used=False,
+                                      normalization=norm_ref, score_kind=loro.score_kind)
             cal_ref = sp.save_calibration(case, cal)
             wl.register(cal_ref, "calibration")
             cal_info = {"performed": True, "scheme": cal.scheme, "holdout_used": cal.holdout_used,
-                        "eer": cal.eer, "threshold_score": cal.threshold_score, "reliable": cal.reliable,
-                        "n_same": cal.n_same, "n_other": cal.n_other, "warnings": cal.warnings}
+                        "score_kind": cal.score_kind, "eer": cal.eer, "threshold_score": cal.threshold_score,
+                        "reliable": cal.reliable, "n_same": cal.n_same, "n_other": cal.n_other,
+                        "warnings": cal.warnings}
             wl.stage("score_calibration", StageKind.DETERMINISTIC, {**cal_info, "material": loro.material,
                                                                     "params": cal.params}, started)
             for w in cal.warnings:
@@ -1803,6 +1866,8 @@ def _speaker_scores(case: Case, subject_id: str, segments: list[SegmentHypothese
     if state.calibration is not None:
         wl.input("score_calibration", state.calibration)
         cal = load_calibration(case, state.calibration)
+        if cal.normalization is not None:
+            wl.input("score_normalization", cal.normalization)
     try:
         scorer = ProfileScorer.load(case, load_profile(case, state.profile), vp, cal)
     except (DatasetError, ValueError) as e:
@@ -1822,6 +1887,7 @@ def _speaker_scores(case: Case, subject_id: str, segments: list[SegmentHypothese
     wl.stage("speaker_scores", StageKind.DETERMINISTIC, {
         "subject_id": subject_id, "profile_version": state.profile_version, "backend": vp.name,
         "calibrated": cal is not None, "calibration_scheme": cal.scheme if cal else None,
+        "score_kind": cal.score_kind if cal else "cosine",
         "n_scored": scored, "n_possible_other_speaker": flagged,
         "note": "Punteggio di somiglianza, mai un'identificazione.",
     }, started, provenance=getattr(vp, "provenance", None))

@@ -14,7 +14,9 @@ Ogni backend registra in `ModelProvenance` (`src/akoe/neural.py`):
 | Uso | Modello (revisione fissata) | Licenza (campo `license` della model card, verificato) |
 |---|---|---|
 | Trascrizione, seconda famiglia | `openai/whisper-tiny` @ `169d4a43`, `openai/whisper-base` @ `e37978b9` | apache-2.0 |
-| Punteggio CTC, predefinito | `jonatasgrosman/wav2vec2-large-xlsr-53-italian` @ `dab04a3e` (XLS-R 53, Common Voice 6.1 it) | apache-2.0 |
+| Allineamento a caratteri, predefinito (issue #58) | `jonatasgrosman/wav2vec2-xls-r-1b-italian` @ `02d4be26` (XLS-R 1B, Common Voice 8 it) | apache-2.0 |
+| Frasi candidate, predefinito (issue #58) | omniASR CTC 1B v2 (EDGE), 3B v2 (WORKSTATION/CLOUD, quando lo SHA-256 è fissato): checkpoint ufficiali Meta, `src/akoe/transcribe/omniasr_ctc.py` | apache-2.0 (repository `facebookresearch/omnilingual-asr`) |
+| Punteggio CTC, precedente | `jonatasgrosman/wav2vec2-large-xlsr-53-italian` @ `dab04a3e` (XLS-R 53, Common Voice 6.1 it) | apache-2.0 |
 | Punteggio CTC, solo test | `facebook/wav2vec2-base-10k-voxpopuli-ft-it` @ `653b3c78` | cc-by-nc-4.0 (non commerciale) |
 | Trascrizione principale | `nvidia/parakeet-tdt-0.6b-v3` @ `541d1f99` | cc-by-4.0 |
 | Trascrizione, tutti i livelli | `CohereLabs/cohere-transcribe-03-2026` @ `d552dadc` (accesso controllato) | apache-2.0 |
@@ -38,6 +40,36 @@ SHA-256 dei pesi pubblicati dal hub (metadati LFS), controllati al caricamento: 
 - `nvidia/stt_it_fastconformer_hybrid_large_pc` (cc-by-4.0, ibrido RNNT+CTC, richiede NeMo).
 
 Non verificate le condizioni dei dati di addestramento (Common Voice, Granary).
+
+## omniASR CTC v2 per le frasi candidate (`omniasr_ctc.py`, issue #58)
+
+- **Pesi:** checkpoint ufficiali Meta (`dl.fbaipublicfiles.com/mms/omniASR-CTC-{1B,3B}-v2.pt`, citati dalle model card di `facebookresearch/omnilingual-asr` @ `81f51e22`, Apache-2.0) e tokenizer `omniASR_tokenizer_written_v2.model`.
+  - SHA-256 fissati: tokenizer `8aa11a10…0b1e`; 1B `354f9817…919c`.
+  - Il 3B (12,3 GB) non è stato scaricato: finché il suo hash non è fissato viene rifiutato, e anche WORKSTATION e CLOUD usano il 1B.
+- **Senza fairseq2:**
+  - il checkpoint contiene solo tensori: si legge con `torch.load(weights_only=True)`, mappato dal file;
+  - i nomi fairseq2 corrispondono uno a uno a `Wav2Vec2ForCTC` di transformers (architettura XLS-R con layer norm prima dei blocchi), con caricamento rigoroso;
+  - ingresso normalizzato a media zero e varianza uno, al massimo 40 s, blank = indice 0.
+- **Vocabolario di 10288 caratteri in forma scritta** (maiuscole, punteggiatura, cifre).
+  - Prima dell'allineamento forzato (Viterbi, un token per carattere), maiuscole e minuscole della stessa lettera vengono sommate. Blank, punteggiatura (tranne l'apostrofo) e simboli speciali diventano un unico blank.
+  - Così il punteggio non dipende da come l'operatore scrive maiuscole e punteggiatura.
+- **Prova su audio reale (2026-11-20, CPU condivisa):** 13 clip italiane (`example-it.wav` di Common Voice e 12 clip MInDS-14 al telefono a 8 kHz).
+  - **Trascrizione greedy:** CER 0 su Common Voice, CER medio 7,2%. Diversi "errori" sono imprecisioni dei testi di riferimento di MInDS-14. La conversione dei pesi quindi funziona.
+  - **Frase vera contro tre frasi alterate** (parole scambiate, tolte o sostituite): la vera è prima in 11 casi su 13. Nei 2 casi restanti l'alterazione tocca una parola che il modello sente diversamente dal riferimento ("voglio", "mago"), probabile imprecisione del riferimento; lo scarto è minimo (0,02 e 0,0003).
+  - **Costi:** circa 6 s per clip di 8-18 s; picco di memoria residente 4,6 GB, con i pesi mappati dal file.
+
+## XLS-R 1B italiano per l'allineamento (issue #58)
+
+- **Pesi:** `jonatasgrosman/wav2vec2-xls-r-1b-italian` @ `02d4be26`, solo `pytorch_model.bin`. Il file è caricato da transformers con `weights_only`; lo SHA-256 `6330c052…15d2` è uguale all'oggetto LFS dell'hub.
+- **Prova sulle stesse 13 clip e con le stesse frasi alterate** usate per omniASR:
+  - CER greedy medio 8,9% (2,6% su Common Voice);
+  - frase vera prima in 12 casi su 13.
+- **Allineatore delle trascrizioni:**
+  - il testo giusto ha un punteggio complessivo tra −0,15 e −1,56;
+  - il testo di un'altra clip, sullo stesso audio, ha un punteggio tra −3,8 e −8,0;
+  - il testo giusto è sopra quello sbagliato in 13 casi su 13.
+  La soglia `DEFAULT_MIN_SCORE` (−1,0) segnala due clip giuste al telefono (−1,44 e −1,56), entrambe con riferimento impreciso: va tarata sul materiale del caso.
+- **Costi:** circa 6 s per clip; picco di memoria residente 4,6 GB.
 
 ## Whisper (`whisper_backend.py`)
 

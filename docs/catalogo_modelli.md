@@ -20,8 +20,8 @@ Livelli: **EDGE** = portatile senza GPU (14 GB RAM); **WORKSTATION** = una GPU N
 
 | Modello | Prestazioni | Licenza | Uso |
 |---|---|---|---|
-| ReDimNet2-B6 (PalabraAI, 2026) | Vox1-O EER 0,23–0,29%, 12,3M parametri | MIT | **Predefinito su tutti i livelli**; la famiglia ReDimNet è la più robusta a Lombard e sussurro nei test disponibili |
-| w2v-BERT 2.0 + MFA (2025) | Vox1-O EER 0,12%, ~600M | repository (licenza del repository) | Massima accuratezza su WORKSTATION/CLOUD; su EDGE solo offline |
+| w2v-BERT 2.0 + MFA (2025) | Vox1-O EER 0,14% (checkpoint rilasciato); sui nostri clip italiani AUC 0,997, EER 1,0% | CC-BY-NC-SA-4.0 | **Predefinito su tutti i livelli** (~2 s per segmento su CPU, offline) |
+| ReDimNet2-B6 (PalabraAI, 2026) | Vox1-O EER 0,23–0,29%, 12,3M parametri; sui nostri clip EER 7,7% (campione piccolo) | MIT | Opzione veloce e seconda opinione; la famiglia ReDimNet è la più robusta a Lombard e sussurro nei test pubblicati |
 | ReDimNet-B6 v1 / ECAPA-TDNN | riferimento | MIT / Apache-2.0 | Confronto e ripiego |
 
 Punteggi: coseno con sottrazione della media, **AS-norm** e **QMF** (ricetta WeSpeaker), poi calibrazione leave-one-recording-out.
@@ -38,20 +38,22 @@ Punteggi: coseno con sottrazione della media, **AS-norm** e **QMF** (ricetta WeS
 
 | Modello | Evidenza | Licenza | Uso |
 |---|---|---|---|
-| UniPASE (2026) | dWER più basso anche con riverbero (8,16 contro 14,16 di AnyEnhance): meno allucinazioni | MIT | WORKSTATION/CLOUD; EDGE offline se i tempi lo consentono |
-| MossFormer2_SE_48K | VoiceBank PESQ 3,15, SI-SDR 19,36 | Apache-2.0 | WORKSTATION |
-| GTCRN | 48K parametri, RTF 0,07 su CPU | MIT | EDGE, rapido |
+| MossFormer2_SE_48K | Sui nostri clip italiani in rumore d'auto: SI-SDR +12,5 dB, ESTOI +0,148, WER di Whisper da 0,327 a 0,286; ~0,4× tempo reale su CPU | Apache-2.0 | **Predefinito** su tutti i livelli (su EDGE accanto a GTCRN) |
+| UniPASE (2026) | dWER più basso nella letteratura, ma sui nostri clip risintetizza (SI-SDR −9,6 dB) e peggiora il WER (0,406) | MIT | Solo su richiesta |
+| GTCRN | 48K parametri; sui nostri clip SI-SDR +10,2 dB, 0,05× tempo reale | MIT | EDGE, versione d'ascolto rapida |
 | DeepFilterNet 3 | robusto e leggero | MIT/Apache-2.0 | EDGE, confronto |
 
 Esclusi i generativi con molte allucinazioni documentate (StoRM, LLaSE-G1).
+
+La scelta predefinita è stata cambiata da UniPASE a MossFormer2 dopo la misura su 7 clip italiani reali in rumore d'auto (0/5/10 dB e riverbero d'abitacolo).
 
 ## Rilevamento della voce
 
 | Modello | Licenza | Uso |
 |---|---|---|
-| Silero VAD 6.2.3 | MIT (PyPI) | Opzione neurale su tutti i livelli |
-| FireRedVAD | Apache-2.0 | Confronto |
-| VAD deterministico di Akoe | SANSEVIERIA 1.1 | Opzione riproducibile, predefinita in modalità forense |
+| FireRedVAD | Apache-2.0 | Opzione neurale (F1 0,954 a 0 dB nei nostri test, con 6% di falsi allarmi) |
+| Silero VAD 6.2.3 | MIT (PyPI) | Opzione neurale (F1 0,903 a 0 dB) |
+| VAD deterministico di Akoe | SANSEVIERIA 1.1 | Predefinito; **l'unico ammesso in modalità forense** (F1 0,913 a 0 dB) |
 
 ## Adattamento al soggetto
 

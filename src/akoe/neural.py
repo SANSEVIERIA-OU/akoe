@@ -129,6 +129,54 @@ def resolve_hf_snapshot(
     return local, commit
 
 
+def download_verified(
+    url: str,
+    dest: Path,
+    expected_sha256: str | None,
+    *,
+    allow_unknown: bool = False,
+    chunk_size: int = 1 << 20,
+) -> str:
+    """Download `url` to `dest` and return its SHA-256, checked BEFORE the file
+    takes its final name (nothing unverified is ever unpickled from `dest`).
+
+    The bytes go to `dest.part` and are hashed while streaming; on a mismatch
+    with `expected_sha256` the partial file is deleted and a RuntimeError
+    (Italian) is raised. Without an expected hash the download is refused
+    unless `allow_unknown=True` (the hash is still returned for the record).
+    """
+    import urllib.request
+
+    if expected_sha256 is None and not allow_unknown:
+        raise RuntimeError(
+            f"Il file {dest.name} non ha uno SHA-256 verificato in questo progetto: download rifiutato. "
+            "Verificarlo e aggiungerlo all'elenco, oppure consentire esplicitamente pesi non verificati."
+        )
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    h = hashlib.sha256()
+    try:
+        with urllib.request.urlopen(url) as r, open(part, "wb") as f:
+            while True:
+                block = r.read(chunk_size)
+                if not block:
+                    break
+                h.update(block)
+                f.write(block)
+        sha = h.hexdigest()
+        if expected_sha256 is not None and sha != expected_sha256:
+            raise RuntimeError(
+                f"Il file scaricato da {url} ha SHA-256 {sha}, diverso da quello verificato "
+                f"({expected_sha256}): scartato."
+            )
+        os.replace(part, dest)
+        return sha
+    finally:
+        if part.exists():
+            part.unlink()
+
+
 def resolve_device(device: str = "cpu") -> str:
     """'cpu', 'cuda', 'cuda:N' or 'auto'. Asking for CUDA without CUDA is an
     explicit error (IMPLEMENTATION_PLAN M8), never a silent fallback."""

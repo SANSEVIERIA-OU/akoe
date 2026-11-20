@@ -6,6 +6,8 @@ Akoe's own code is under [SANSEVIERIA License 1.1](LICENSE). The components belo
 
 ## Python libraries
 
+Also installed for the neural stages: omegaconf, einops, rotary-embedding-torch, torchinfo, pystoi, silero-vad, fireredvad, kaldi-native-fbank, kaldiio, TextGrid (their own permissive licences; check before release).
+
 | Component | Use | Licence |
 | --- | --- | --- |
 | typer, pydantic, noisereduce, faster-whisper, fastapi | CLI, data models, stationary noise reduction, Whisper inference (CTranslate2), engine API | MIT |
@@ -22,13 +24,23 @@ Akoe's own code is under [SANSEVIERIA License 1.1](LICENSE). The components belo
 | --- | --- | --- | --- |
 | OpenAI Whisper (tiny … large-v3, turbo) | transcription with alternatives, teacher-forced scoring, adaptation | MIT (repository); card of large-v3 says Apache-2.0 | https://github.com/openai/whisper |
 | NVIDIA Parakeet-TDT 0.6B v3 (revision `541d1f99`) | transcription with entropy confidence | CC-BY-4.0 | https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 |
-| jonatasgrosman/wav2vec2-large-xlsr-53-italian | CTC forced alignment and candidate scoring | Apache-2.0 | https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-italian |
-| SpeechBrain ECAPA-TDNN (spkrec-ecapa-voxceleb) | speaker embedding (reference backend) | Apache-2.0 | https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb |
-| ReDimNet (IDRnD) | speaker embedding (recommended backend) | MIT (repository licence; see owner decision above) | https://github.com/IDRnD/ReDimNet |
+| jonatasgrosman/wav2vec2-large-xlsr-53-italian | earlier CTC model, kept as an option | Apache-2.0 | https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-italian |
+| SpeechBrain ECAPA-TDNN (spkrec-ecapa-voxceleb) | speaker embedding (comparison and fallback) | Apache-2.0 | https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb |
+| ReDimNet (IDRnD) | speaker embedding (comparison) | MIT (repository licence; see owner decision above) | https://github.com/IDRnD/ReDimNet |
 | CohereLabs/cohere-transcribe-03-2026 (revision `d552dadc`) | transcription (ensemble); gated on Hugging Face: requires accepting Cohere's terms and an HF token | Apache-2.0 | https://huggingface.co/CohereLabs/cohere-transcribe-03-2026 |
 | Qwen/Qwen3-ASR-1.7B-hf (revision `bcd2b5b7`) | transcription (ensemble) | Apache-2.0 | https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf |
 | Qwen3-ForcedAligner-0.6B-hf (revision `c07281df`) | word timestamps for Qwen3-ASR | Apache-2.0 | https://huggingface.co/Qwen |
 | NVIDIA Nemotron 3.5 Transcribe 30B-A4B (revision `c1766764`) | transcription on the CLOUD tier (GPU ≥ 78 GB) | OpenMDW-1.1 | https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B |
+| ReDimNet2-B6 (PalabraAI, commit `c5bbe0b7`, weights pinned by SHA-256) | speaker embedding (fast option) | MIT | https://github.com/PalabraAI/redimnet2 |
+| w2v-BERT 2.0 SV (`zl389/w2v-bert-2.0_SV@4e7b92e8`, `model_lmft_0.14.pth`) | speaker embedding (default) | CC-BY-NC-SA-4.0 (repository `License.md`) | https://github.com/ZXHY-82/w2v-BERT-2.0_SV |
+| Meta omniASR CTC 1B v2 (and 3B v2 on WORKSTATION/CLOUD) | candidate scoring ("X o Y?") | Apache-2.0 | https://github.com/facebookresearch/omnilingual-asr |
+| jonatasgrosman/wav2vec2-xls-r-1b-italian (revision `02d4be26`) | character-level transcript alignment | Apache-2.0 | https://huggingface.co/jonatasgrosman/wav2vec2-xls-r-1b-italian |
+| MossFormer2_SE_48K (ClearerVoice-Studio, upstream code at a fixed commit) | neural cleaning for listening (default) | Apache-2.0 | https://huggingface.co/alibabasglab/MossFormer2_SE_48K |
+| UniPASE | neural cleaning for listening (on request) | MIT (code); model card says Apache-2.0 | https://github.com/xiaobin-rong/unipase |
+| GTCRN | quick neural cleaning on EDGE | MIT | https://github.com/Xiaobin-Rong/gtcrn |
+| DeepFilterNet 3 (official ONNX export) | neural cleaning, comparison | MIT or Apache-2.0 | https://github.com/Rikorose/DeepFilterNet |
+| Silero VAD 6.2.3 | neural VAD (investigative mode) | MIT per PyPI (the repository badge text says CC BY-NC 4.0) | https://github.com/snakers4/silero-vad |
+| FireRedVAD | neural VAD (investigative mode) | Apache-2.0 | https://github.com/FireRedTeam/FireRedVAD |
 | facebook/wav2vec2-base-10k-voxpopuli-ft-it | tests only | CC-BY-NC-4.0 | https://huggingface.co/facebook/wav2vec2-base-10k-voxpopuli-ft-it |
 
 Models added later are listed here when their backend is merged, with the licence read from the card.
