@@ -223,9 +223,9 @@ Ordine scelto: prima il cuore del prodotto (profilo del soggetto → alternative
   - tracciamento e attenuazione delle armoniche del motore (`stages/harmonics.py`);
   - cancellazione con riferimento (`stages/reference_cancel.py`): identificazione del brano o della trasmissione per impronta acustica (strumenti open-source da valutare), allineamento, filtro adattivo. Il riverbero dell'abitacolo impedisce la sottrazione semplice (Alexander et al. 2012); attenzione a non eliminare la voce se trapela nel riferimento.
   - Tutti i parametri nel log, in linea con SWGDE 20-A-001-2.0.
-- **Strato neurale** (`run_neural`): pulizia informata dal parlante, **per l'ascolto del trascrittore umano**, etichettata come neurale.
-  - Prima scelta ispezionabile: dizionari NMF della voce del soggetto più dizionario del rumore misurato dell'auto.
-  - Opzione neurale: modello di pulizia rifinito sul parlato del soggetto, con rumore dell'auto simulato.
+- **Pulizia d'ascolto informata dal parlante**, **per l'ascolto del trascrittore umano**.
+  - Prima scelta ispezionabile: dizionari NMF della voce del soggetto più dizionario del rumore misurato dell'auto (`stages/listening.py`). È riproducibile (seme fissato, basi ispezionabili), quindi è etichettata `DETERMINISTIC`, con la nota "basata su modello, solo per l'ascolto" nel log (decisione del 2026-11-20).
+  - Opzione neurale (`run_neural`, etichetta `NEURAL`): modello di pulizia rifinito sul parlato del soggetto, con rumore dell'auto simulato.
   - Evidenze: guadagni moderati e reali per gli ascoltatori (Goehring et al. 2017; Leer et al. 2026); nessuno studio nelle condizioni esatte del caso (`MASTER_PLAN.md` 3.5.1).
 - **Cosa va al trascrittore automatico:**
   - per impostazione predefinita l'audio originale, al più dopo cancellazione della radio e filtri lievi;
