@@ -350,4 +350,4 @@ Ordine scelto: prima il cuore del prodotto (profilo del soggetto → alternative
 - Evidenze e fonti: `MASTER_PLAN.md`, sezione 12.
 - Censimento dei modelli di maggio 2026: `MASTER_PLAN.md`, Appendice D.
 - Kalliope (metodo di esportazione ONNX verificata): `/workspace/kalliope/tools/pocket_export/`.
-- Memoria della prima sessione: `/home/dev/.claude/projects/-workspace-nuovo-progetto/memory/` (riflette l'impostazione di maggio 2026).
+- Memoria della prima sessione: file di memoria locali di Claude Code sulla macchina di sviluppo (riflettono l'impostazione di maggio 2026).

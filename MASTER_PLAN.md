@@ -473,6 +473,25 @@ Restano le modalità FORENSIC / INVESTIGATIVE / BOTH e l'invariante `audio_prove
 
 **Vincolo invariato:** niente servizi SaaS di terzi; l'audio passa solo per macchine controllate.
 
+### 5.2.1 Configurazioni di installazione
+
+L'app parla con il motore solo attraverso l'API, quindi lo stesso Akoe si installa in quattro modi:
+
+| Configurazione | Dove gira l'app | Dove gira il motore | Esempio |
+|---|---|---|---|
+| **Tutto in uno** | Sulla stessa macchina | Sulla stessa macchina, con GPU | Workstation Linux potente; NVIDIA DGX (Spark, Station o server) con la sua distribuzione Linux |
+| **GPU in rete locale** | Portatile o postazione del perito | Su una DGX o un server GPU collegato in LAN, mai esposto a internet | La postazione dell'operatore con una DGX in laboratorio |
+| **Solo portatile** | Portatile | Portatile (sidecar), modelli più piccoli | Lavoro in trasferta |
+| **Cloud controllato** | Postazione | VM con GPU dell'utente (vincoli dell'`IMPLEMENTATION_PLAN.md` §8) | Nemotron 3.5 Transcribe su H100 |
+
+Requisiti da coprire in M8:
+- connessione cifrata e autenticata tra app e motore in rete locale (TLS o tunnel SSH, token);
+- build CUDA del motore, anche per **ARM64**: la DGX Spark ha CPU ARM e memoria unificata da 128 GB, quindi pacchetti Python e app vanno provati su aarch64;
+- distribuzione dei job tra più GPU;
+- misura dei requisiti reali per ciascuna configurazione (#45).
+
+Con molta memoria GPU (DGX) entrano anche i modelli più grandi del catalogo (Nemotron 3.5 Transcribe, Voxtral Small, omniASR 7B).
+
 ### 5.3 Lezioni da Kalliope
 
 Da Kalliope si riprende il metodo, non il modello:
@@ -832,7 +851,7 @@ L'assistente ha proposto un esperimento di fattibilità come primo passo; l'uten
 
 ### A.3 Memoria persistente
 
-I file di memoria della prima sessione sono in `/home/dev/.claude/projects/-workspace-nuovo-progetto/memory/` (nome precedente della cartella del progetto): `project_audio_forensics.md`, `feedback_audio_forensics_hallucination.md`, `feedback_tech_selection_bias.md`, `feedback_no_context_assumptions.md`, `reference_audio_forensics_sota_2025.md`. Riflettono l'impostazione di maggio 2026.
+I file di memoria della prima sessione sono conservati localmente da Claude Code sulla macchina di sviluppo: `project_audio_forensics.md`, `feedback_audio_forensics_hallucination.md`, `feedback_tech_selection_bias.md`, `feedback_no_context_assumptions.md`, `reference_audio_forensics_sota_2025.md`. Riflettono l'impostazione di maggio 2026.
 
 ---
 
