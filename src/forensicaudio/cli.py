@@ -89,6 +89,32 @@ def case_verify(root: Path = typer.Argument(..., help="Case directory.")) -> Non
     typer.echo("All evidence hashes verified.")
 
 
+@app.command()
+def serve(
+    cases_root: Path = typer.Option(Path("cases"), "--cases-root", help="Directory holding the cases."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address. Keep 127.0.0.1 unless behind an encrypted tunnel."),
+    port: int = typer.Option(8765, "--port"),
+    tier: Tier = typer.Option(Tier.EDGE, "--tier"),
+    token_file: Path | None = typer.Option(None, "--token-file", help="Write the bearer token here (mode 600) instead of stdout."),
+) -> None:
+    """Start the engine API for the desktop app (sidecar or remote engine)."""
+    import os
+    import secrets
+
+    import uvicorn
+
+    from forensicaudio.api.server import create_app
+
+    token = secrets.token_urlsafe(32)
+    if token_file is not None:
+        token_file.write_text(token)
+        os.chmod(token_file, 0o600)
+        typer.echo(f"WHISPER_ENGINE_READY host={host} port={port} token_file={token_file}")
+    else:
+        typer.echo(f"WHISPER_ENGINE_READY host={host} port={port} token={token}")
+    uvicorn.run(create_app(cases_root, token=token, tier=tier), host=host, port=port, log_level="warning")
+
+
 @app.command(name="extract-embedding")
 def extract_embedding(
     samples: Path = typer.Option(..., "--speaker-samples", "-s"),
