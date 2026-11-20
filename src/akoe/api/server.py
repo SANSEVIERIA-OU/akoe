@@ -296,7 +296,8 @@ def register_workflows(runner: JobRunner, *, tier: Tier, paths: PathPolicy, back
 
     # -- clean -------------------------------------------------------------
     def prep_clean(case: Case, p: dict[str, Any]) -> dict[str, Any]:
-        _check_keys(p, {"evidence_id", "variants", "subject_id", "vehicle_id", "reference", "stage_params"})
+        _check_keys(p, {"evidence_id", "variants", "subject_id", "vehicle_id", "reference", "stage_params",
+                        "neural", "vad"})
         kw: dict[str, Any] = {"evidence_id": _id(p, "evidence_id"), **_common(p, tier),
                               "subject_id": _id(p, "subject_id", False), "vehicle_id": _id(p, "vehicle_id", False)}
         if p.get("variants") is not None:
@@ -305,11 +306,19 @@ def register_workflows(runner: JobRunner, *, tier: Tier, paths: PathPolicy, back
             kw["reference"] = paths.resolve(case, p["reference"], what="riferimento")
         if p.get("stage_params"):
             kw["stage_params"] = dict(p["stage_params"])
+        if p.get("neural") is not None:
+            neural = p["neural"]
+            if not (isinstance(neural, str) or (isinstance(neural, list)
+                                                and all(isinstance(n, str) for n in neural))):
+                raise ValueError("neural deve essere un nome di backend o una lista di nomi")
+            kw["neural"] = neural
+        if p.get("vad") is not None:
+            kw["vad"] = str(p["vad"])
         return kw
 
     def job_clean(case: Case, kw: dict[str, Any], progress: Callable[[float, str], None]) -> dict[str, Any]:
         eid = kw.pop("evidence_id")
-        return done(engine.clean(case, eid, progress=progress, **kw))
+        return done(engine.clean(case, eid, provider=provider(), progress=progress, **kw))
 
     # -- transcribe --------------------------------------------------------
     def adapter_param(case: Case, value: Any) -> Any:
@@ -319,7 +328,7 @@ def register_workflows(runner: JobRunner, *, tier: Tier, paths: PathPolicy, back
 
     def prep_transcribe(case: Case, p: dict[str, Any]) -> dict[str, Any]:
         _check_keys(p, {"evidence_id", "pair_id", "adapter", "lexicon", "subject_id", "whisper_model", "n_best",
-                        "lexicon_weight"})
+                        "lexicon_weight", "vad"})
         kw: dict[str, Any] = {"evidence_id": _id(p, "evidence_id", False), "pair_id": _id(p, "pair_id", False),
                               "subject_id": _id(p, "subject_id", False), **_common(p, tier),
                               "adapter": adapter_param(case, p.get("adapter"))}
@@ -327,7 +336,7 @@ def register_workflows(runner: JobRunner, *, tier: Tier, paths: PathPolicy, back
             raise ValueError("Indicare evidence_id oppure pair_id")
         if p.get("lexicon"):
             kw["lexicon"] = paths.resolve(case, p["lexicon"], what="lessico")
-        for key in ("whisper_model", "n_best", "lexicon_weight"):
+        for key in ("whisper_model", "n_best", "lexicon_weight", "vad"):
             if p.get(key) is not None:
                 kw[key] = p[key]
         return kw
@@ -597,7 +606,7 @@ def create_app(cases_root: Path, token: str | None = None, tier: Tier = Tier.EDG
             return evidence_audio(case_id, evidence_id)
         index = engine.listening_index(case, evidence_id) or {}
         entry = next((v for v in index.get("variants", []) if v.get("variant") == variant
-                      and variant in engine.LISTENING_VARIANTS), None)
+                      and engine.is_listening_variant(variant)), None)
         if entry is None:
             raise HTTPException(status_code=404, detail=f"Versione d'ascolto non trovata: {variant}")
         from akoe.models import ArtifactRef

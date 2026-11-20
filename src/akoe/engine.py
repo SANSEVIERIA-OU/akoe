@@ -369,7 +369,9 @@ class DefaultBackends:
     """Real models (lazy, cached per process): ReDimNet-B2 voiceprint, Italian
     CTC model for alignment and candidate scoring, the ASR ensemble (Cohere
     Transcribe, Qwen3-ASR, Parakeet-TDT when NeMo is installed, Whisper
-    generic / adapted, Nemotron on CLOUD), LoRA trainer.
+    generic / adapted, Nemotron on CLOUD), LoRA trainer, neural listening
+    enhancers and neural VADs (optional methods, looked up with ``getattr``
+    so that providers without them keep working).
 
     `asr_ensemble` (or the AKOE_ASR_ENSEMBLE variable, comma-separated) selects
     the transcribers; default `default_asr_ensemble(tier)`. With `low_memory`
@@ -500,6 +502,21 @@ class DefaultBackends:
         from akoe.adapt.train import train_adapter
 
         return train_adapter
+
+    def enhancer(self, name: str) -> Any:
+        """Neural listening enhancer (issue #59), loaded on first use."""
+        from akoe.stages.neural_clean import get_enhancer
+
+        return self._get(("enhancer", name), lambda: get_enhancer(
+            name, device=self.device, local_files_only=self.local_files_only))
+
+    def vad_detector(self, name: str, **params: Any) -> Any:
+        """Neural VAD (issue #60): ``silero`` or ``firered``."""
+        from akoe.stages.vad_neural import get_detector
+
+        extra = {"local_files_only": self.local_files_only} if name == "firered" else {}
+        key = ("vad", name, tuple(sorted((k, repr(v)) for k, v in params.items())))
+        return self._get(key, lambda: get_detector(name, **extra, **params))
 
 
 _PROVIDER: BackendProvider | None = None
@@ -1210,6 +1227,13 @@ LISTENING_LABELS_IT = {
 }
 
 
+def is_listening_variant(name: str) -> bool:
+    """Deterministic variant names plus the neural ones (``neural_<backend>``)."""
+    from akoe.stages.neural_clean import is_neural_variant
+
+    return name in LISTENING_VARIANTS or is_neural_variant(name)
+
+
 def _subject_ltas(case: Case, subject_id: str, channel: Channel) -> dict[str, float] | None:
     from akoe.speaker.profile import load_profile
 
@@ -1270,6 +1294,55 @@ def _vehicle_noise(case: Case, vehicle_id: str, sr: int, max_seconds: float) -> 
     return audio, refs
 
 
+def _detect(audio: np.ndarray, sr: int, vad: str | Any, vad_params: Mapping[str, Any], wl: WorkflowLog,
+            provider: BackendProvider | None, input_sha256: str,
+            extra: Callable[[list[tuple[float, float]]], dict[str, Any]] | None = None,
+            ) -> list[tuple[float, float]]:
+    """Speech regions from the chosen VAD (``vad.detect_regions``), logged as
+    a stage ``vad_<method>`` of the right kind; a neural VAD is also noted.
+    Neural detectors come from the provider (``vad_detector``) when it has
+    one, so that they are loaded once per process."""
+    from akoe.stages.vad import VAD_METHODS, detect_regions
+    from akoe.stages.vad_neural import get_detector
+
+    started = _now()
+    detector = None if isinstance(vad, str) else vad
+    from akoe.stages.vad import VAD_METHODS as _KNOWN_VADS
+
+    if wl.mode == Mode.FORENSIC and (not isinstance(vad, str) or (vad in _KNOWN_VADS and vad != "robust")):
+        raise EngineError("In modalità forense il rilevamento della voce è solo deterministico (vad=robust): "
+                          "i VAD neurali richiedono la modalità investigativa o entrambe.")
+    try:
+        if isinstance(vad, str) and vad != "robust":
+            if vad not in VAD_METHODS:
+                raise ValueError(f"VAD sconosciuto: {vad!r}; disponibili: {', '.join(VAD_METHODS)}")
+            factory = getattr(_provider(provider), "vad_detector", None)
+            detector = factory(vad, **dict(vad_params)) if factory else get_detector(vad, **dict(vad_params))
+        segments, params = detect_regions(audio, sr, method="robust" if detector is None else str(vad),
+                                          detector=detector, **({} if detector else dict(vad_params)))
+    except ValueError as e:
+        raise EngineError(str(e)) from e
+    except NotImplementedError as e:
+        raise EngineError(f"VAD {getattr(vad, 'name', vad)} non disponibile: {e}") from e
+    kind = StageKind(params["kind"])
+    wl.stage(f"vad_{params['method']}", kind, {**params, **(extra(segments) if extra else {})}, started,
+             input_sha256=input_sha256, provenance=getattr(detector, "provenance", None))
+    if kind == StageKind.NEURAL:
+        wl.note(f"Rilevamento della voce con VAD neurale ({params['method']}): le regioni di parlato "
+                "dipendono da un modello; il VAD riproducibile resta quello predefinito in modalità forense.")
+    return segments
+
+
+def _enhancer(provider: BackendProvider | None, backend: str, params: Mapping[str, Any]) -> Any:
+    """Neural enhancer from the provider (``enhancer``) or built directly."""
+    from akoe.stages.neural_clean import get_enhancer
+
+    factory = getattr(_provider(provider), "enhancer", None)
+    if factory is not None and not params:
+        return factory(backend)
+    return get_enhancer(backend, **dict(params))
+
+
 def clean(
     case: Case,
     evidence_id: str,
@@ -1280,8 +1353,11 @@ def clean(
     reference: Path | None = None,
     stage_params: Mapping[str, Mapping[str, Any]] | None = None,
     nmf_max_seconds: float = 120.0,
+    neural: str | Sequence[str] | Mapping[str, Any] | None = None,
+    vad: str | Any = "robust",
     mode: Mode = Mode.FORENSIC,
     tier: Tier = Tier.EDGE,
+    provider: BackendProvider | None = None,
     progress: ProgressFn | None = None,
 ) -> WorkflowResult:
     """Listening variants of an evidence item for the HUMAN transcriber.
@@ -1292,9 +1368,24 @@ def clean(
     are never chained or merged, and neural audio never shares an artifact
     with deterministic audio. The automatic transcriber keeps using the
     original audio (CLAUDE.md invariant 7).
+
+    ``neural`` (investigative or both modes only) adds one NEURAL listening
+    variant per backend, ``neural_<backend>`` under ``listening/neural/``:
+    backend names, ``"default"`` for the tier defaults
+    (``neural_clean.DEFAULT_BACKENDS``: EDGE GTCRN + UniPASE, WORKSTATION and
+    CLOUD UniPASE), or a mapping name -> enhancer object. Nothing neural runs
+    unless requested (models are large and are downloaded on first use).
+    ``stage_params["neural"]`` goes to ``neural_clean.enhance`` (``chunking``
+    as a dict, ``match_level``), ``stage_params["neural_<backend>"]`` to the
+    backend constructor.
+
+    ``vad``: ``"robust"`` (deterministic, default), ``"silero"``,
+    ``"firered"`` (neural, ``stage_params["vad"]`` are their settings) or a
+    detector object. The speech regions feed the band SNR, the noise profile
+    and the engine-harmonic tracker; a neural VAD is recorded as a NEURAL
+    stage and noted in the log.
     """
-    from akoe.stages import bands, denoise, harmonics, listening, reference_cancel
-    from akoe.stages.vad import detect_speech
+    from akoe.stages import bands, denoise, harmonics, listening, neural_clean, reference_cancel
 
     progress = progress or _noop
     sp_ = {k: dict(v) for k, v in (stage_params or {}).items()}
@@ -1302,9 +1393,20 @@ def clean(
     unknown = [v for v in requested if v not in LISTENING_VARIANTS]
     if unknown:
         raise EngineError(f"Varianti d'ascolto sconosciute: {unknown}; disponibili: {list(LISTENING_VARIANTS)}")
+    try:
+        neural_named = (dict(neural) if isinstance(neural, Mapping)
+                        else {b: None for b in neural_clean.resolve_backends(neural, tier)})
+    except ValueError as e:
+        raise EngineError(str(e)) from e
+    if neural_named and mode == Mode.FORENSIC:
+        raise EngineError("La pulizia neurale richiede la modalità investigativa o entrambe "
+                          "(mode=investigative o both): in modalità forense solo trasformazioni "
+                          "riproducibili.")
+    vad_name = vad if isinstance(vad, str) else getattr(vad, "name", "custom")
     params = {"evidence_id": evidence_id, "variants": requested, "subject_id": subject_id,
               "vehicle_id": vehicle_id, "reference": str(reference) if reference else None,
-              "stage_params": sp_, "nmf_max_seconds": nmf_max_seconds}
+              "stage_params": sp_, "nmf_max_seconds": nmf_max_seconds,
+              "neural": list(neural_named), "vad": vad_name}
     wl = WorkflowLog(case, "clean", mode=mode, tier=tier, parameters=params)
     item, path = verified_evidence(case, evidence_id)
     wl.input(f"evidence:{evidence_id}", item.artifact)
@@ -1313,18 +1415,19 @@ def clean(
     out_dir = case.dir("outputs") / evidence_id / "listening"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    started = _now()
-    speech, vad_params = detect_speech(audio, sr, **sp_.get("vad", {}))
-    wl.stage("vad_robust", StageKind.DETERMINISTIC, vad_params, started, input_sha256=ev_sha)
+    speech = _detect(audio, sr, vad, sp_.get("vad", {}), wl, provider, ev_sha)
     produced: list[dict[str, Any]] = []
     artifacts: dict[str, ArtifactRef | None] = {}
 
     def emit(variant: str, y: np.ndarray, p: dict[str, Any], started: datetime, *,
              kind: StageKind = StageKind.DETERMINISTIC, label: str | None = None,
-             extra: dict[str, Any] | None = None) -> None:
-        tmp = out_dir / f".{variant}.{uuid.uuid4().hex[:8]}.tmp.wav"
+             extra: dict[str, Any] | None = None, subdir: str | None = None,
+             provenance: Any = None) -> None:
+        vdir = out_dir / subdir if subdir else out_dir
+        vdir.mkdir(parents=True, exist_ok=True)
+        tmp = vdir / f".{variant}.{uuid.uuid4().hex[:8]}.tmp.wav"
         write_info = write_mono(tmp, y, sr)
-        ref = _finalize(case, tmp, out_dir / f"{variant}.wav", "listening_variant")
+        ref = _finalize(case, tmp, vdir / f"{variant}.wav", "listening_variant")
         label = label or LISTENING_LABELS_IT[variant]
         record = {
             "schema": "akoe.listening-variant/v1", "variant": variant, "label_it": label,
@@ -1332,10 +1435,10 @@ def clean(
             "is_original": False, "evidence_id": evidence_id, "evidence_sha256": ev_sha,
             "audio": ref.model_dump(mode="json"), "params": {**p, **write_info}, **(extra or {}),
         }
-        rec_ref = _write_versioned(case, out_dir / f"{variant}.json", dump_json_bytes(to_jsonable(record)),
+        rec_ref = _write_versioned(case, vdir / f"{variant}.json", dump_json_bytes(to_jsonable(record)),
                                    "listening_variant_record")
         wl.stage(f"listening:{variant}", kind, {**p, **write_info, "label_it": label}, started,
-                 input_sha256=ev_sha, output_sha256=ref.sha256)
+                 input_sha256=ev_sha, output_sha256=ref.sha256, provenance=provenance)
         wl.register(ref, f"listening:{variant}")
         wl.register(rec_ref)
         artifacts[variant] = ref
@@ -1415,13 +1518,34 @@ def clean(
 
     if mode in (Mode.INVESTIGATIVE, Mode.BOTH):
         started = _now()
-        ndir = out_dir / "neural"
-        ndir.mkdir(exist_ok=True)
-        try:
-            denoise.run_neural(path, ndir / "neural.wav")
-        except NotImplementedError as e:
-            wl.skipped("listening:neural", StageKind.NEURAL, {"purpose": "human listening"},
-                       f"Pulizia neurale non disponibile: {e or 'non implementata'}", started)
+        if not neural_named:
+            defaults = neural_clean.default_backends(tier)
+            wl.skipped("listening:neural", StageKind.NEURAL,
+                       {"purpose": "human listening", "available": list(neural_clean.available_backends()),
+                        "tier_defaults": list(defaults)},
+                       "Pulizia neurale non richiesta: indicare i backend (neural), oppure 'default' per "
+                       f"quelli del livello {tier.value}: {', '.join(defaults)}", started)
+        enhance_opts = dict(sp_.get("neural", {}))
+        if isinstance(enhance_opts.get("chunking"), Mapping):
+            enhance_opts["chunking"] = neural_clean.Chunking(**enhance_opts["chunking"])
+        for i, (backend, enh) in enumerate(neural_named.items()):
+            variant = neural_clean.variant_name(backend)
+            progress(0.9 + 0.09 * i / max(len(neural_named), 1), f"Pulizia neurale: {backend}")
+            started = _now()
+            try:
+                enh = enh if enh is not None else _enhancer(provider, backend, sp_.get(variant, {}))
+                prov = enh.load()
+                y, prm = neural_clean.enhance(audio, sr, enh, **enhance_opts)
+            except NotImplementedError as e:  # BackendUnavailable: missing package or weights
+                wl.skipped(f"listening:{variant}", StageKind.NEURAL, {"backend": backend},
+                           f"Pulizia neurale {backend} non disponibile: {e or 'non implementata'}", started)
+                continue
+            emit(variant, y, {**prm, "speech_segments_used": False}, started, kind=StageKind.NEURAL,
+                 label=prm["label_it"], subdir="neural", provenance=prov)
+        if neural_named:
+            wl.note("Le versioni neurali sono ipotesi per l'ascolto umano, in una cartella separata; non "
+                    "sono mai unite all'audio riproducibile né date al trascrittore automatico senza "
+                    "autovalutazione.")
 
     original = {"variant": "original", "label_it": LISTENING_LABELS_IT["original"],
                 "audio_provenance": StageKind.DETERMINISTIC.value, "is_original": True,
@@ -1481,6 +1605,7 @@ def transcribe(
     asr_systems: Sequence[str] | None = None,
     n_best: int = 5,
     vad_params: Mapping[str, Any] | None = None,
+    vad: str | Any = "robust",
     segment_pad_s: float = 0.1,
     combine_config: Any = None,
     guard_config: Any = None,
@@ -1506,9 +1631,10 @@ def transcribe(
     word, checked by the hallucination guard and written to
     ``outputs/<evidence>/transcript.json``. With `subject_id`, every segment
     also gets the voiceprint score against the subject profile (a score,
-    never an identification).
+    never an identification). ``vad`` selects the regions' detector:
+    ``"robust"`` (deterministic, default), ``"silero"`` or ``"firered"``
+    (neural, settings in ``vad_params``; recorded as a NEURAL stage).
     """
-    from akoe.stages.vad import detect_speech
     from akoe.transcribe.combine import HypothesisSource, combine_hypotheses
     from akoe.transcribe.format import TRANSCRIPT_KIND, build_transcript
     from akoe.transcribe.guard import guard_segments
@@ -1520,6 +1646,7 @@ def transcribe(
               "lexicon": None if lexicon is None else str(getattr(lexicon, "lexicon_id", lexicon)),
               "lexicon_weight": lexicon_weight, "subject_id": subject_id, "whisper_model": whisper_model,
               "asr_systems": list(asr_systems) if asr_systems is not None else None, "n_best": n_best, "vad_params": dict(vad_params or {}), "segment_pad_s": segment_pad_s,
+              "vad": vad if isinstance(vad, str) else getattr(vad, "name", "custom"),
               "audio_variant": "original", "audio_provenance": StageKind.DETERMINISTIC.value}
     wl = WorkflowLog(case, "transcribe", mode=mode, tier=tier, parameters=params)
     if pair_id is not None:
@@ -1543,11 +1670,10 @@ def transcribe(
     audio = audio64.astype(np.float32)
     duration = len(audio) / sr
     progress(0.05, "Rilevamento della voce")
-    started = _now()
-    speech, vparams = detect_speech(audio64, sr, **dict(vad_params or {}))
+    speech = _detect(audio64, sr, vad, vad_params or {}, wl, provider, ev_sha,
+                     extra=lambda segs: {"asr_regions": _pad_merge(segs, segment_pad_s, duration),
+                                         "segment_pad_s": segment_pad_s})
     regions = _pad_merge(speech, segment_pad_s, duration)
-    wl.stage("vad_robust", StageKind.DETERMINISTIC, {**vparams, "asr_regions": regions,
-                                                      "segment_pad_s": segment_pad_s}, started, input_sha256=ev_sha)
     if not regions:
         wl.note("Nessun parlato rilevato dal rilevatore di voce: trascrizione vuota")
 
@@ -2132,7 +2258,7 @@ __all__ = [
     "ASR_SYSTEMS", "BackendProvider", "DefaultBackends", "EngineError", "LISTENING_VARIANTS", "LexiconASR",
     "RecordingSpec", "SubjectModelState", "VehicleChannelAugment", "VerifiedAdapter", "WorkflowLog", "WorkflowResult",
     "build_subject_model", "build_vehicle_profile", "channel_augment_for", "clean", "default_asr_ensemble",
-    "get_backend_provider",
+    "get_backend_provider", "is_listening_variant",
     "listening_index", "load_subject_model", "load_vehicle_profile", "read_self_assessment", "read_transcript",
     "resolve_adapter", "score_candidates", "self_assess", "set_backend_provider", "train_subject_adapter",
     "transcribe", "verified_evidence",

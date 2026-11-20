@@ -196,6 +196,44 @@ def run_deterministic_offline(input_path: Path, output_path: Path, *, subtype: s
     return params
 
 
-def run_neural(input_path: Path, output_path: Path) -> None:
-    """DeepFilterNet. Neural enhancement — investigative mode only."""
-    raise NotImplementedError("Install [ml] extras and integrate DeepFilterNet here.")
+def run_neural(
+    input_path: Path,
+    output_path: Path,
+    *,
+    backend: Any = None,
+    device: str = "cpu",
+    local_files_only: bool = False,
+    subtype: str = "PCM_16",
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Neural cleaning for HUMAN LISTENING (issue #59), labelled NEURAL.
+
+    ``backend``: a name (``unipase``, ``mossformer2_se_48k``, ``gtcrn``,
+    ``deepfilternet3``) or a :class:`neural_clean.NeuralEnhancer`. There is
+    no implicit backend: without one this raises ``BackendUnavailable``
+    (a ``NotImplementedError``, so pipelines record the stage as skipped)
+    instead of downloading models. Tier defaults:
+    ``neural_clean.default_backends(tier)``. ``kwargs`` go to
+    :func:`neural_clean.enhance` (``chunking``, ``match_level``). Returns the
+    params for the log (model id, revision, weight SHA-256, device, chunking,
+    input/output SHA-256). The output is never the automatic transcriber's
+    input without self-assessment (CLAUDE.md invariant 7).
+    """
+    from akoe.config import Tier
+    from akoe.neural import BackendUnavailable
+    from akoe.stages import neural_clean
+
+    if backend is None:
+        raise BackendUnavailable(
+            "Pulizia neurale: nessun backend indicato. Disponibili: "
+            f"{', '.join(neural_clean.available_backends())}; predefiniti per livello: EDGE "
+            f"{'+'.join(neural_clean.default_backends(Tier.EDGE))}, WORKSTATION/CLOUD "
+            f"{'+'.join(neural_clean.default_backends(Tier.WORKSTATION))}.")
+    enhancer = (neural_clean.get_enhancer(backend, device=device, local_files_only=local_files_only)
+                if isinstance(backend, str) else backend)
+    audio, sr = load_mono(input_path)
+    y, params = neural_clean.enhance(audio, sr, enhancer, **kwargs)
+    params.update(write_mono(output_path, y, sr, subtype=subtype))
+    params["input_sha256"] = sha256_file(input_path)
+    params["output_sha256"] = sha256_file(output_path)
+    return params
