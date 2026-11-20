@@ -1,9 +1,11 @@
 """Hypothesis transcript format (IMPLEMENTATION_PLAN M2, issue #17).
 
 Builds and writes `transcript.json` as a `HypothesisTranscript`:
-- every segment carries `audio_provenance = NEURAL` (machine text is a
-  neural product, whatever audio variant it was transcribed from; the
-  variant is recorded in each Alternative's `audio_variant`);
+- every segment keeps the `audio_provenance` it declared: it describes the
+  AUDIO the text was transcribed from (deterministic original/cleaned audio,
+  or neural audio), not the text. Machine text is always an AI hypothesis
+  through `HypothesisTranscript.is_ai_hypothesis`; the audio variant of each
+  reading is in `Alternative.audio_variant`;
 - every word with a confidence gets a confidence band;
 - segments whose confidence is below a configurable threshold, or that
   have no readable text, are labelled UNINTELLIGIBLE (label added, text kept);
@@ -19,7 +21,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from forensicaudio.config import StageKind
 from forensicaudio.models import ArtifactRef, HypothesisTranscript, SegmentFlag, SegmentHypotheses
 from forensicaudio.transcribe.combine import (
     COMBINED_PREFIX,
@@ -78,21 +79,11 @@ def is_unintelligible(seg: SegmentHypotheses, cfg: FormatConfig | None = None) -
     return conf is not None and conf < cfg.unintelligible_threshold
 
 
-def ensure_neural_provenance(seg: SegmentHypotheses) -> SegmentHypotheses:
-    if seg.audio_provenance == StageKind.NEURAL:
-        return seg
-    log.warning(
-        "segment %.2f-%.2f declared %s provenance; machine transcription is a neural "
-        "product, setting NEURAL", seg.start, seg.end, seg.audio_provenance.value,
-    )
-    return seg.model_copy(update={"audio_provenance": StageKind.NEURAL})
-
-
 def prepare_segment(seg: SegmentHypotheses, cfg: FormatConfig | None = None) -> SegmentHypotheses:
-    """NEURAL provenance, confidence bands and UNINTELLIGIBLE label. Existing
-    flags are never removed; texts and alternatives are not touched."""
+    """Confidence bands and UNINTELLIGIBLE label. Provenance, existing flags,
+    texts and alternatives are never changed."""
     cfg = cfg or DEFAULT_FORMAT
-    seg = ensure_neural_provenance(seg).model_copy(deep=True)
+    seg = seg.model_copy(deep=True)
     for w in seg.words:
         if w.confidence is not None and (cfg.recompute_bands or w.confidence_band is None):
             w.confidence_band = confidence_band(w.confidence, cfg.bands)
@@ -146,9 +137,6 @@ def write_transcript(
 ) -> ArtifactRef:
     """Write JSON atomically and return its ArtifactRef (path relative to
     `root` when given, e.g. the case root)."""
-    for seg in transcript.segments:
-        if seg.audio_provenance != StageKind.NEURAL:
-            raise ValueError("machine segments must have NEURAL provenance; use build_transcript")
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(transcript.model_dump_json(indent=2), encoding="utf-8")

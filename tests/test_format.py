@@ -62,14 +62,13 @@ def test_unintelligible_threshold_is_configurable():
     assert not is_unintelligible(empty, FormatConfig(empty_is_unintelligible=False))
 
 
-def test_build_transcript_labels_bands_and_provenance(caplog):
+def test_build_transcript_labels_bands_and_provenance():
     segments = [seg([0.9, 0.95], start=5.0), seg([0.2, 0.3], start=0.0, prov=StageKind.DETERMINISTIC)]
-    with caplog.at_level(logging.WARNING):
-        t = build_transcript("case-1", segments, evidence_id="ev-1")
-    assert "NEURAL" in caplog.text
+    t = build_transcript("case-1", segments, evidence_id="ev-1")
     assert t.is_ai_hypothesis is True and t.evidence_id == "ev-1"
     assert [s.start for s in t.segments] == [0.0, 5.0]  # sorted by time
-    assert all(s.audio_provenance == StageKind.NEURAL for s in t.segments)
+    # audio_provenance describes the audio, so it is kept as declared
+    assert [s.audio_provenance for s in t.segments] == [StageKind.DETERMINISTIC, StageKind.NEURAL]
     assert t.segments[0].flags == [SegmentFlag.UNINTELLIGIBLE]
     assert t.segments[1].flags == []
     assert [w.confidence_band for w in t.segments[1].words] == [ConfidenceBand.HIGH, ConfidenceBand.HIGH]
@@ -109,10 +108,11 @@ def test_write_and_read_with_sha256(tmp_path):
         read_transcript(path, ref)
 
 
-def test_write_refuses_non_neural_segments(tmp_path):
+def test_write_keeps_audio_provenance(tmp_path):
     t = HypothesisTranscript(case_id="c", segments=[seg([0.9], prov=StageKind.DETERMINISTIC)])
-    with pytest.raises(ValueError):
-        write_transcript(t, tmp_path / "t.json")
+    ref = write_transcript(t, tmp_path / "t.json")
+    back = read_transcript(tmp_path / "t.json", expected=ref)
+    assert back.segments[0].audio_provenance == StageKind.DETERMINISTIC and back.is_ai_hypothesis
 
 
 def test_end_to_end_two_models(tmp_path):
