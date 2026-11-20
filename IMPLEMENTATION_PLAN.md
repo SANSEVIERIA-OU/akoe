@@ -314,7 +314,6 @@ Ordine scelto: prima il cuore del prodotto (profilo del soggetto → alternative
 - **Pulizia d'ascolto:** NMF del soggetto o modello neurale rifinito, dopo il confronto sul banco di prova.
 - **Effetto sui trascrittori umani** della presentazione delle alternative: nessuno studio controllato, da osservare nel prodotto.
 - **Strumentazione di misura** del veicolo e formato della microspia (registrazione locale o trasmissione compressa).
-- **Inquadramento legale:** AI Act, dati biometrici, trattamento dei dati in ambito di polizia.
 - **Scenari con più parlanti:** ritorno di diarizzazione ed estrazione del parlante.
 - **Materiale reale** per il banco di prova.
 

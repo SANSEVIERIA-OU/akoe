@@ -46,7 +46,7 @@ Il sistema non promette di recuperare informazione che non è nel segnale. Dove 
 - **Cassazione, Ufficio del Massimario, Relazione n. 35/2020** (23/03/2020): la trascrizione serve a rendere il contenuto "più agevolmente consultabile" e non costituisce di per sé prova, che resta la registrazione. Per WHISPER questo conta: uno strumento di supporto alla trascrizione rientra in questo quadro, purché non si presenti come fonte di prova.
 - La legge non definisce con precisione la trascrizione forense (AISV, Studi 10, 2023). Non esistono linee guida standardizzate per trascrivere le intercettazioni (Meluzzi 2025, preprint). Esiste una proposta di linee guida AISV-OLF del 2019† ed è aperto un dibattito sul carattere descrittivo o interpretativo della trascrizione (Romito 2025†, Camera penale di Catanzaro).
 - Secondo la stampa (7/9/2026), la Procura generale di Perugia ha adottato linee guida che ammettono l'AI come ausilio con verifica umana obbligatoria (testo non letto).
-- **Da verificare con un legale** (non coperto dalle ricerche): inquadramento del sistema nell'AI Act (uso da parte delle forze dell'ordine, trattamento di dati biometrici vocali) e nella disciplina sul trattamento dei dati personali in ambito di polizia.
+- **Verifica legale: decisione del proprietario (2026-11-20).** Il software è destinato alle forze dell'ordine e il proprietario considera soddisfatta la verifica legale (issue #47 chiusa). Restano questioni distinte i termini di licenza dei modelli di terze parti (#46).
 
 ### 1.4 Rischi specifici dell'AI in contesto probatorio
 
@@ -538,7 +538,7 @@ Due livelli: l'autovalutazione per caso (4.7) e la valutazione durante lo svilup
 8. **Chi guida.** Il soggetto potrebbe non essere alla guida, o esserci passeggeri occasionali: serve la verifica del parlante su ogni tratto.
 9. **Nessun benchmark pubblico** su registrazioni nascoste in auto.
 10. **Licenze.** Alcuni modelli candidati sono CC-BY-NC; i pesi di Pocket TTS hanno termini sul consenso; le licenze dei modelli di verifica del parlatore sono da verificare.
-11. **Inquadramento legale da verificare:** AI Act, dati biometrici, trattamento dei dati in ambito di polizia.
+11. **Inquadramento legale:** considerato soddisfatto per decisione del proprietario (software per le forze dell'ordine, 2026-11-20); restano i termini di licenza dei modelli (#46).
 12. **Ammissibilità.** La trascrizione resta del trascrittore; WHISPER è uno strumento di supporto e la prova resta la registrazione (1.3).
 
 ---
@@ -581,6 +581,7 @@ Due livelli: l'autovalutazione per caso (4.7) e la valutazione durante lo svilup
 | 2026-11-20 | Microspia con registrazione locale e trasmissione: due reperti per evento; la locale è l'ingresso predefinito; la coppia serve a misurare il canale di trasmissione | Informazione dell'utente | Deciso |
 | 2026-11-20 | Codec variabili: rilevati per file e simulati in addestramento (G.711, MP3, Opus, Vorbis; AMR/GSM se c'è un encoder) | Informazione dell'utente; robustezza al codec | Deciso |
 | 2026-11-20 | Repository privato `SANSEVIERIA-OU/whisper` con roadmap (milestone M0-M8) e issue | Richiesta dell'utente | Deciso |
+| 2026-11-20 | Verifica legale considerata soddisfatta (#47) | Decisione del proprietario: software per le forze dell'ordine | Deciso |
 
 ---
 
