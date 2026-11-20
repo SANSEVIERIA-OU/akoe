@@ -133,12 +133,9 @@ class CTCTranscriptAligner:
         return lp, FRAME_STRIDE / TARGET_SR
 
     # ------------------------------------------------------------- alignment
-    def align(self, audio: np.ndarray, sr: int, text: str) -> list[AlignedSpan]:
-        """Timed spans of `text` in `audio`; [] when alignment is impossible
-        (the reason, in Italian, is in `last_report["warnings"]`)."""
-        warnings: list[str] = []
-        self.last_report = {"aligner": self.name, "warnings": warnings}
-        tokens = [_Token(t) for t in text.split()]
+    def _targets(self, tokens: list[_Token], warnings: list[str]) -> tuple[list[str], list[int], list[tuple[int, int]]]:
+        """Normalize each whitespace token to the model's alphabet (filling
+        `tok.words`) and build the CTC target sequence with the word ranges."""
         words: list[str] = []
         for tok in tokens:
             ws, w = self.scorer.normalize_text(tok.text)
@@ -146,9 +143,6 @@ class CTCTranscriptAligner:
             for word in ws:
                 tok.words.append(len(words))
                 words.append(word)
-        if not words:
-            warnings.append("Trascrizione senza parole allineabili.")
-            return []
         vocab, delim = self.scorer._vocab, self.scorer._delim
         targets: list[int] = []
         ranges: list[tuple[int, int]] = []
@@ -158,8 +152,10 @@ class CTCTranscriptAligner:
             a = len(targets)
             targets.extend(vocab[c] for c in w)
             ranges.append((a, len(targets)))
+        return words, targets, ranges
 
-        a16 = prepare_audio(audio, sr)
+    def _force_align(self, a16: np.ndarray, targets: list[int], warnings: list[str]) -> tuple[np.ndarray, float, Any] | None:
+        """Emissions and Viterbi path, or None (reason appended to `warnings`)."""
         duration = len(a16) / TARGET_SR
         est_frames = len(a16) / FRAME_STRIDE
         trellis = est_frames * (2 * len(targets) + 1)
@@ -168,12 +164,65 @@ class CTCTranscriptAligner:
                 f"Registrazione troppo lunga per l'allineamento in un solo passaggio ({duration:.0f} s, "
                 f"{len(targets)} caratteri): dividerla in registrazioni più brevi."
             )
-            return []
+            return None
         lp, spf = self._emissions(a16)
         path = ctc_viterbi(lp, targets, self.scorer._blank)
         if not np.isfinite(path.logprob):
             warnings.append("Testo troppo lungo per la durata dell'audio: allineamento impossibile.")
+            return None
+        return lp, spf, path
+
+    def word_times(self, audio: np.ndarray, sr: int, words: list[str]) -> list[tuple[float, float] | None]:
+        """Start and end (seconds from the start of `audio`) of each given
+        whitespace word, by CTC forced alignment of the whole word sequence.
+
+        A word with nothing the model can score (digits, symbols) gets None,
+        and so does every word when the alignment is impossible (reason, in
+        Italian, in `last_report["warnings"]`). Used by ASR backends whose
+        model gives no timestamps (Cohere Transcribe)."""
+        warnings: list[str] = []
+        self.last_report = {"aligner": self.name, "warnings": warnings}
+        tokens = [_Token(w) for w in words]
+        norm, targets, ranges = self._targets(tokens, warnings)
+        if not norm:
+            warnings.append("Trascrizione senza parole allineabili.")
+            return [None] * len(words)
+        aligned = self._force_align(prepare_audio(audio, sr), targets, warnings)
+        if aligned is None:
+            return [None] * len(words)
+        lp, spf, path = aligned
+        spans = path.token_spans(len(targets))
+        out: list[tuple[float, float] | None] = []
+        for tok in tokens:
+            if not tok.words:
+                out.append(None)
+                continue
+            a, b = ranges[tok.words[0]][0], ranges[tok.words[-1]][1]
+            out.append((round(spans[a][0] * spf, 3), round(spans[b - 1][1] * spf, 3)))
+        free = lp.max(axis=1)
+        n_free = int(np.count_nonzero(lp.argmax(axis=1) != self.scorer._blank))
+        overall = float((path.frame_logprobs - free).sum() / max(len(targets), n_free, 1))
+        self.last_report.update(overall_score=round(overall, 4), n_words=len(norm), n_frames=int(lp.shape[0]),
+                                seconds_per_frame=spf)
+        return out
+
+    def align(self, audio: np.ndarray, sr: int, text: str) -> list[AlignedSpan]:
+        """Timed spans of `text` in `audio`; [] when alignment is impossible
+        (the reason, in Italian, is in `last_report["warnings"]`)."""
+        warnings: list[str] = []
+        self.last_report = {"aligner": self.name, "warnings": warnings}
+        tokens = [_Token(t) for t in text.split()]
+        words, targets, ranges = self._targets(tokens, warnings)
+        if not words:
+            warnings.append("Trascrizione senza parole allineabili.")
             return []
+
+        a16 = prepare_audio(audio, sr)
+        duration = len(a16) / TARGET_SR
+        aligned = self._force_align(a16, targets, warnings)
+        if aligned is None:
+            return []
+        lp, spf, path = aligned
         free = lp.max(axis=1)
         free_ids = lp.argmax(axis=1)
         gap = path.frame_logprobs - free  # <= 0 per frame

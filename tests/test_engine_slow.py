@@ -81,7 +81,8 @@ def test_real_italian_case_end_to_end(tmp_path):
     from tests import m6_synth
 
     try:
-        backends = engine.DefaultBackends(whisper_model="openai/whisper-tiny", ctc_model=CTC, local_files_only=True)
+        backends = engine.DefaultBackends(whisper_model="openai/whisper-tiny", ctc_model=CTC, local_files_only=True,
+                                          asr_ensemble=("whisper",))
         backends.whisper("openai/whisper-tiny").load()
         backends.ctc_scorer().load()
         vp = EcapaVoiceprint(local_files_only=True)
