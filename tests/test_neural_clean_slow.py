@@ -76,7 +76,8 @@ def test_neural_vads_find_the_italian_speech(mixture, method):
     speech = (1.0, len(clean) / SR - 1.0)
     covered = sum(max(0.0, min(e, speech[1]) - max(s, speech[0])) for s, e in segs)
     assert covered >= 0.7 * (speech[1] - speech[0])
-    assert all(e <= speech[0] - 0.4 or s >= speech[0] - 0.4 for s, e in segs if s < 0.5)
+    # No detection confined to the leading car noise (well before the speech).
+    assert not [(s, e) for s, e in segs if e < speech[0] - 0.3]
 
 
 def test_engine_clean_writes_a_real_neural_listening_variant(tmp_path):
