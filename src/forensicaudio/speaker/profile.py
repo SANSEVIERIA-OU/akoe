@@ -10,7 +10,10 @@
   (MASTER_PLAN §3.5.3, §4.2).
 - `calibrate_scores`: logistic regression on case material (subject segments
   vs other speakers) and a calibrated threshold below which a segment is
-  flagged "possibile altro parlante".
+  flagged "possibile altro parlante". The scores come from
+  `loro_calibration_scores` (leave-one-recording-out on training material,
+  issue #49), so the self-assessment holdout never enters the calibration;
+  `calibration_scores` (holdout by default) is kept for compatibility.
 
 The voiceprint is a similarity score for triage, selection and warnings. It
 is never an attribution of the voice to a person (CLAUDE.md invariant 6):
@@ -320,6 +323,12 @@ class ScoreCalibration(BaseModel):
     eer_threshold: float
     params: dict[str, Any]
     warnings: list[str] = Field(default_factory=list)
+    # How the subject scores were obtained (issue #49): "leave-one-recording-out"
+    # on training material keeps the self-assessment holdout out of the
+    # calibration; "holdout" (the old default of `calibration_scores`) makes the
+    # EER measured later on the same holdout optimistic.
+    scheme: str = "unspecified"
+    holdout_used: bool | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -342,8 +351,14 @@ def calibrate_scores(
     threshold_probability: float = 0.5,
     C: float = 1.0,
     min_per_class: int = 10,
+    scheme: str = "unspecified",
+    holdout_used: bool | None = None,
 ) -> ScoreCalibration:
-    """Fit P(subject | score) with scikit-learn's LogisticRegression on standardized scores."""
+    """Fit P(subject | score) with scikit-learn's LogisticRegression on standardized scores.
+
+    `scheme` / `holdout_used` record where the scores come from (see
+    `loro_calibration_scores`); a calibration on holdout material gets a warning.
+    """
     if len(same) < 2 or len(other) < 2:
         raise DatasetError(
             "Calibrazione impossibile: servono almeno 2 punteggi del soggetto e 2 di altri parlanti"
@@ -380,6 +395,11 @@ def calibrate_scores(
             f"Pochi punteggi per la calibrazione ({s.size} del soggetto, {o.size} di altri parlanti; "
             f"consigliati almeno {min_per_class} per classe): soglia indicativa"
         )
+    if holdout_used:
+        warnings.append(
+            "Calibrazione fatta sulla quota di autovalutazione: l'errore dell'impronta misurato poi "
+            "sulla stessa quota risulterà ottimistico"
+        )
     eer, eer_t = equal_error_rate(s, o)
     return ScoreCalibration(
         backend=backend,
@@ -402,6 +422,8 @@ def calibrate_scores(
         params={"C": C, "class_weight": "balanced", "solver": "lbfgs", "max_iter": 1000,
                 "features": "standardized similarity score"},
         warnings=warnings,
+        scheme=scheme,
+        holdout_used=holdout_used,
     )
 
 
@@ -550,6 +572,10 @@ def calibration_scores(
     material, plus optional extra other-speaker audio `(audio, sr)`.
 
     Returns (subject scores, other-speaker scores, description of the material).
+
+    Prefer `loro_calibration_scores` (issue #49): calibrating on the holdout
+    makes the self-assessment of the voiceprint on that same holdout
+    optimistic. The description records `holdout_used`.
     """
     splits = tuple(subject_splits)
     sr = scorer.analysis_sr
@@ -576,7 +602,146 @@ def calibration_scores(
         {
             "subject_segments": f"items in splits {[s.value for s in splits]}",
             "other_speakers": f"{len(dataset.other_speaker_spans)} labelled spans + {len(extra_other)} extra clips",
+            "scheme": "fixed centroids",
+            "holdout_used": DatasetSplit.HOLDOUT in splits,
         },
         sort_keys=True,
     )
     return same, other, material
+
+
+LORO_SCHEME = "leave-one-recording-out"
+
+
+class LOROScores(BaseModel):
+    """Subject and other-speaker scores for a leave-one-recording-out calibration."""
+
+    same: list[float]
+    other: list[float]
+    material: dict[str, Any]
+    warnings: list[str] = Field(default_factory=list)  # Italian
+
+    def material_json(self) -> str:
+        return json.dumps(self.material, sort_keys=True)
+
+
+def _recording_group(dataset: SubjectDataset, recording_id: str) -> str:
+    rec = dataset.recording(recording_id)
+    return f"pair:{rec.pair_id}" if rec.pair_id else f"rec:{rec.recording_id}"
+
+
+def _centroids(embeds: Sequence[tuple[str, np.ndarray]]) -> dict[str, np.ndarray]:
+    groups: dict[str, list[np.ndarray]] = {}
+    for key, v in embeds:
+        groups.setdefault(key, []).append(v)
+    out = {}
+    for key in sorted(groups):
+        c = _unit(np.stack(groups[key]).mean(axis=0))
+        if c is not None:
+            out[key] = c
+    return out
+
+
+def _best(v: np.ndarray, centroids: dict[str, np.ndarray]) -> float:
+    return max(float(np.dot(v, c)) for c in centroids.values())
+
+
+def loro_calibration_scores(
+    case: Case,
+    dataset: SubjectDataset,
+    backend: VoiceprintBackend,
+    *,
+    items: Sequence[DatasetItem] | None = None,
+    analysis_sr: int = 16000,
+    min_seconds: float = 0.5,
+    extra_other: Sequence[tuple[np.ndarray, int]] = (),
+) -> LOROScores:
+    """Leave-one-recording-out scores on TRAINING material only (issue #49).
+
+    For each recording group (a `pair_id`, otherwise one recording) of the
+    training split, per-condition centroids are rebuilt from the training
+    items of all the OTHER groups; the subject's items of the left-out group
+    and the other speakers' labelled spans of the same group are scored
+    against them, as `ProfileScorer` would (best cosine over conditions).
+    No holdout recording is touched, so the self-assessment of the voiceprint
+    on the holdout stays an honest estimate. `extra_other` clips (other
+    speakers outside the case recordings) are scored against the centroids
+    of all training items.
+
+    `items` defaults to the items eligible for the profile (verified, train,
+    aligned, without blocking errors); any non-train item is refused.
+    """
+    if items is None:
+        items = dataset.select_items(splits=(DatasetSplit.TRAIN,), verified_only=True)
+    if any(it.split != DatasetSplit.TRAIN for it in items):
+        raise DatasetError("La calibrazione leave-one-recording-out usa solo segmenti di addestramento")
+    warnings: list[str] = []
+    audio = _AudioCache(case, dataset, analysis_sr)
+
+    subj: list[tuple[str, str, np.ndarray]] = []  # (group, condition key, unit embedding)
+    for it in sorted(items, key=lambda it: it.item_id):
+        if it.end - it.start < min_seconds:
+            continue
+        v = _unit(backend.embed(audio.segment(it.recording_id, it.start, it.end), analysis_sr))
+        if v is not None:
+            subj.append((_recording_group(dataset, it.recording_id), it.condition.key(), v))
+    train_recs = {r.recording_id for r in dataset.recordings if r.split == DatasetSplit.TRAIN}
+    holdout_recs = {r.recording_id for r in dataset.recordings if r.split == DatasetSplit.HOLDOUT}
+    oth: list[tuple[str, np.ndarray]] = []
+    n_holdout_spans = 0
+    for span in dataset.other_speaker_spans:
+        if span.recording_id not in train_recs:
+            n_holdout_spans += int(span.recording_id in holdout_recs)
+            continue
+        if span.end - span.start < min_seconds:
+            continue
+        v = _unit(backend.embed(audio.segment(span.recording_id, span.start, span.end), analysis_sr))
+        if v is not None:
+            oth.append((_recording_group(dataset, span.recording_id), v))
+
+    groups = sorted({g for g, _, _ in subj} | {g for g, _ in oth})
+    same: list[float] = []
+    other: list[float] = []
+    skipped: list[str] = []
+    for g in groups:
+        cents = _centroids([(k, v) for gg, k, v in subj if gg != g])
+        if not cents:
+            skipped.append(g)
+            continue
+        same += [_best(v, cents) for gg, _, v in subj if gg == g]
+        other += [_best(v, cents) for gg, v in oth if gg == g]
+    if skipped:
+        warnings.append(
+            f"{len(skipped)} gruppi di registrazioni esclusi dalla calibrazione: senza altre registrazioni "
+            "di addestramento non si può costruire l'impronta che li esclude"
+        )
+    full = _centroids([(k, v) for _, k, v in subj])
+    n_extra = 0
+    if full:
+        for a, a_sr in extra_other:
+            v = _unit(backend.embed(np.asarray(a, dtype=np.float32), a_sr))
+            if v is not None:
+                other.append(_best(v, full))
+                n_extra += 1
+    if n_holdout_spans:
+        warnings.append(
+            f"{n_holdout_spans} tratti di altri parlanti nelle registrazioni di autovalutazione non usati "
+            "per la calibrazione (restano per l'autovalutazione)"
+        )
+    material = {
+        "scheme": LORO_SCHEME,
+        "holdout_used": False,
+        "subject_segments": "training items, each scored against centroids rebuilt without its "
+                            "recording group (pair_id, otherwise recording)",
+        "other_speakers": "labelled other-speaker spans in training recordings, scored like the subject "
+                          "items of the same group; extra clips against all training centroids",
+        "n_groups": len(groups),
+        "skipped_groups": skipped,
+        "n_subject_scores": len(same),
+        "n_other_scores": len(other),
+        "n_extra_other": n_extra,
+        "min_seconds": min_seconds,
+        "analysis_sr": analysis_sr,
+        "backend": backend.name,
+    }
+    return LOROScores(same=same, other=other, material=material, warnings=warnings)
