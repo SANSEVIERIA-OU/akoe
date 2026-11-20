@@ -62,8 +62,11 @@ def test_output_is_json_serializable_and_records_every_parameter(profile_a):
     assert "noise floor" in profile_a["gate"]["criterion"]
 
 
-def test_deterministic(voice_a, profile_a):
-    assert compute_timbre([TimbreSource(voice_a.copy(), SR, label="a")]) == profile_a
+def test_deterministic(voice_a):
+    y = voice_a[: 3 * SR]
+    spans = [(0.0, 1.0), (1.5, 2.8)]
+    first = compute_timbre([TimbreSource(y, SR, spans=spans, label="a")])
+    assert compute_timbre([TimbreSource(y.copy(), SR, spans=spans, label="a")]) == first
 
 
 def test_gate_uses_only_subject_spans_above_the_noise_floor():

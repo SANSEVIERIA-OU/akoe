@@ -36,7 +36,8 @@ Transcription formats
   keys are ignored. A bare list of segments is accepted too. When speaker
   labels are present, pass ``subject_speaker``: segments of other speakers do
   not become DatasetItems and are kept as `SpeakerSpan`s (other-speaker
-  material for score calibration, see `profile.py`).
+  material for score calibration, see `profile.py`); unlabelled segments are
+  attributed to the subject.
 
 Folder import
 -------------
