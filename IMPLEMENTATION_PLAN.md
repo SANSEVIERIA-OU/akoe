@@ -57,26 +57,29 @@ Le ricerche del 2026-11-20 sull'analisi del timbro, sul rapporto tra pulizia e t
 
 ## 3. Moduli del motore
 
-| Modulo | File previsto | Tipo | Stato | Fase |
+| Modulo | File | Tipo | Stato | Fase |
 |---|---|---|---|---|
-| Caso, copia di lavoro, catena di custodia | `pipeline.py`, `utils.py`, `models.py` | DETERMINISTIC | esiste | M0 (estensione) |
-| Preprocessing (16 kHz mono, normalizzazione) | `stages/preprocess.py` | DETERMINISTIC | esiste | — |
-| Rilevamento della voce | `stages/vad.py` | DETERMINISTIC | esiste (a energia) | M6 (miglioramento) |
-| Riduzione del rumore stazionaria | `stages/denoise.py:run_deterministic` | DETERMINISTIC | esiste | M6 (estensione) |
-| Dati del soggetto (import, allineamento, divisione) | `speaker/dataset.py` | DETERMINISTIC | da fare | M1 |
-| Impronta vocale | `speaker/voiceprint.py` (da `stages/embedding.py`) | NEURAL (pesi fissi) | stub | M1 |
-| Profilo timbrico-spettrale | `speaker/timbre.py` | DETERMINISTIC | da fare | M1 |
-| Trascrizione con alternative | `transcribe/asr.py` (da `stages/asr.py`) | NEURAL | stub | M2 |
-| Punteggio delle frasi candidate | `transcribe/candidates.py` | NEURAL | da fare | M2 |
-| Profilo del veicolo | `vehicle/profile.py` | DETERMINISTIC | da fare | M3 |
-| Simulazione del canale | `vehicle/simulate.py` | DETERMINISTIC | da fare | M3 |
-| Adattamento del trascrittore | `adapt/train.py`, `adapt/artifact.py` | NEURAL | da fare | M4 |
-| Lessico del caso | `adapt/lexicon.py` | NEURAL (influenza il decoding) | da fare | M4 |
-| Autovalutazione | `assess/selfcheck.py` | DETERMINISTIC (misura) | da fare | M5 |
-| Filtri per bande e armoniche del motore | `stages/bands.py`, `stages/harmonics.py` | DETERMINISTIC | da fare | M6 |
-| Cancellazione con riferimento (radio/musica) | `stages/reference_cancel.py` | DETERMINISTIC | da fare | M6 |
-| Pulizia personalizzata | `stages/denoise.py:run_neural` | NEURAL | stub | M6 |
-| API del motore | `api/server.py` | — | da fare | M7 |
+| Caso, copia di lavoro, catena di custodia | `case.py`, `models.py`, `utils.py` | DETERMINISTIC | fatto: reperti in sola lettura con hash, registro di ogni flusso nel manifest del caso | M0 |
+| Flussi del caso (orchestrazione) | `engine.py` | — | fatto: modello del soggetto, profilo del veicolo, pulizia, trascrizione, candidate, adattatore, autovalutazione; registro con hash, parametri, modelli, livello, device | M7 |
+| Preprocessing (16 kHz mono, normalizzazione) | `stages/preprocess.py` | DETERMINISTIC | fatto | — |
+| Rilevamento della voce | `stages/vad.py` | DETERMINISTIC | fatto: a energia e robusto al rumore d'auto (predefinito nei flussi) | M6 |
+| Riduzione del rumore | `stages/denoise.py` | DETERMINISTIC | fatto: stazionaria e con profilo dell'intera registrazione | M6 |
+| Dati del soggetto (import, allineamento, divisione) | `speaker/dataset.py`, `transcribe/ctc_aligner.py` | DETERMINISTIC (allineamento: NEURAL) | fatto: allineamento CTC delle trascrizioni senza tempi, con segnalazione dei male allineati (#7) | M1 |
+| Impronta vocale | `speaker/voiceprint_backends.py`, `speaker/profile.py` | NEURAL (pesi fissi) | fatto: ReDimNet-B2 e ECAPA; profilo per condizione; calibrazione leave-one-recording-out (#49) | M1 |
+| Profilo timbrico-spettrale | `speaker/timbre.py` | DETERMINISTIC | fatto | M1 |
+| Ciclo di verifica | `speaker/verification.py` | DETERMINISTIC | fatto | M1 |
+| Trascrizione con alternative | `transcribe/whisper_backend.py`, `parakeet_backend.py`, `combine.py`, `guard.py`, `format.py` | NEURAL | fatto; Parakeet-TDT 0.6B non ancora eseguito (RAM) | M2 |
+| Punteggio delle frasi candidate | `transcribe/candidates.py`, `transcribe/ctc_scorer.py` | NEURAL | fatto; soglie dall'autovalutazione | M2 |
+| Profilo del veicolo | `vehicle/profile.py`, `vehicle/measure.py` | DETERMINISTIC | fatto: misurato o stimato | M3 |
+| Simulazione del canale e codec | `vehicle/simulate.py`, `vehicle/codecs.py`, `vehicle/pairs.py` | DETERMINISTIC | fatto | M3 |
+| Adattamento del trascrittore | `adapt/dataset.py`, `adapt/train.py`, `adapt/artifact.py` | NEURAL | fatto; provato su CPU solo con modelli piccoli | M4 |
+| Lessico del caso | `adapt/lexicon.py` | NEURAL (influenza il decoding) | fatto | M4 |
+| Autovalutazione | `assess/selfcheck.py`, `assess/metrics.py` | DETERMINISTIC (misura) | fatto | M5 |
+| Filtri per bande e armoniche del motore | `stages/bands.py`, `stages/harmonics.py` | DETERMINISTIC | fatto | M6 |
+| Cancellazione con riferimento (radio/musica) | `stages/reference_cancel.py` | DETERMINISTIC | fatto; riferimento fornito dall'operatore (identificazione del brano da fare) | M6 |
+| Pulizia d'ascolto informata dal parlante | `stages/listening.py` (NMF), `stages/denoise.py:run_neural` | DETERMINISTIC (NMF) / NEURAL | NMF fatto; neurale stub | M6 |
+| Rimescolamento e scelta dell'ingresso | `stages/remix.py` | DETERMINISTIC | fatto; non ancora collegato ai flussi | M6 |
+| API del motore | `api/server.py` | — | fatto: job per ogni flusso, trascrizione, autovalutazione, ascolto etichettato, candidate; esportazione da fare | M7 |
 | Esportazione per la perizia | `export/perizia.py` | DETERMINISTIC | da fare | M7 |
 | App desktop | `app/` (progetto Tauri) | — | da fare | M7 |
 | Estrazione del parlante (TSE) | `stages/extract.py` | NEURAL | **accantonato** | — |
@@ -85,17 +88,44 @@ Le ricerche del 2026-11-20 sull'analisi del timbro, sul rapporto tra pulizia e t
 
 ## 4. Stato attuale del codice
 
-Verificato il 2026-05-25 sulla macchina di test (Ryzen 5 PRO 6650U, 14 GB RAM, senza GPU); il codice è invariato al 2026-11-20.
+Verificato il 2026-11-20 sulla macchina di test (Ryzen 5 PRO 6650U, 14 GB RAM, senza GPU).
 
-**Funziona end-to-end in `mode=FORENSIC`:**
-- preprocessing (`stages/preprocess.py`);
-- riduzione del rumore stazionaria (`stages/denoise.py:run_deterministic`, noisereduce);
-- rilevamento della voce a energia su frame di 30 ms (`stages/vad.py`);
-- orchestratore con SHA-256 di input e output per stadio (`pipeline.py`);
-- CLI `forensicaudio process` (`--mode`, `--evidence`, `--speaker-samples`, `--output`, `--case-id`);
-- 2 test pytest verdi.
+**Flussi del caso** (`engine.py`), gli stessi per API e CLI:
+- **modello del soggetto:** import delle registrazioni di riferimento; allineamento CTC delle trascrizioni senza tempi, con i segmenti male allineati segnalati; divisione per registrazione; revisione, oppure accettazione delle trascrizioni esistenti da parte di un operatore nominato (esclusi i segmenti dubbi); profilo con impronta e timbro per condizione; calibrazione leave-one-recording-out sulle sole registrazioni di addestramento;
+- **profilo del veicolo:** misurato oppure stimato dai tratti senza voce di un reperto;
+- **pulizia:** versioni d'ascolto separate ed etichettate (bande, riduzione del rumore, armoniche del motore, cancellazione con riferimento, NMF del soggetto), mai unite all'audio neurale;
+- **trascrizione:** ingresso = audio originale (della coppia, la registrazione locale); VAD robusto; Whisper generico, Whisper adattato se c'è un adattatore verificato, Parakeet se c'è NeMo; lettura con e senza lessico; combinazione, guardia contro le allucinazioni, `outputs/<reperto>/transcript.json`; punteggio dell'impronta per segmento;
+- **frasi candidate:** CTC e decoder Whisper riportati separatamente, con le soglie dall'autovalutazione;
+- **adattatore:** solo segmenti verificati di addestramento, con canale del veicolo e codec variabili; l'adattatore viene verificato prima di essere registrato;
+- **autovalutazione:** materiale messo da parte, degradato con canale e codec; risultati per condizione; sintesi in italiano che dichiara il metodo di calibrazione.
 
-**Non implementati:** `denoise.run_neural`, `embedding.run`, `extract.run` e `asr.run` sollevano `NotImplementedError`, registrato nel log come "skipped".
+**Catena di custodia:** ogni flusso scrive un registro in sola lettura in `logs/`, elencato nel manifest del caso, con:
+- hash degli ingressi e parametri;
+- modelli con hash dei pesi, livello e device.
+
+Ogni uscita è conservata come versione immutabile per hash (`versions/`), quindi i registri precedenti restano verificabili.
+
+**API e CLI:**
+- **API:** un job con avanzamento per ogni flusso; caricamento dei file nel caso; percorsi limitati alla cartella del caso o alle cartelle di import dichiarate; lettura di trascrizione, modello del soggetto, autovalutazione e registri; ascolto delle versioni con etichetta e provenienza nelle intestazioni; punteggio delle candidate sincrono con timeout.
+- **CLI:** un comando per flusso (`subject-model`, `vehicle-profile`, `clean`, `transcribe`, `candidates`, `train-adapter`, `self-assess`).
+- La pipeline di maggio (`pipeline.py`, `forensicaudio process`) resta per confronto.
+
+**Test:** 338 veloci verdi (backend finti; 1 saltato), 9 lenti (modelli reali, esclusi per impostazione predefinita). Il test lento `tests/test_engine_slow.py` porta un caso reale attraverso tutti i flussi, offline:
+- **audio:** il clip italiano di SpeechBrain inserito in rumore d'auto sintetico; 12 clip MInDS-14 it-IT come registrazioni di riferimento;
+- **modelli:** whisper-tiny, il modello CTC piccolo, ECAPA;
+- **esito:** passa in circa 100 s, con un picco di 2,4 GB di RAM:
+  - whisper-tiny trascrive correttamente la frase nel rumore d'auto;
+  - entrambi i metodi mettono al primo posto la frase giusta tra tre candidate;
+  - 6 segmenti allineati su 24 sono segnalati come dubbi;
+  - un adattatore LoRA di 2 passi viene addestrato, verificato e usato, e l'autovalutazione mostra che peggiora (WER circa 348% contro 55% del modello generico). È il tipo di risultato che la misura per caso deve rivelare.
+
+**Non ancora fatto o non verificato:**
+- Parakeet-TDT 0.6B non eseguito: circa 5 GB di RAM al caricamento, da provare su workstation (#45);
+- Whisper large e LoRA su modelli grandi richiedono una GPU; tempi e memoria da misurare (#45);
+- pulizia neurale (`run_neural`): ancora stub, registrata come saltata;
+- rimescolamento pulito/originale per il trascrittore: il modulo c'è, ma l'autovalutazione non misura ancora le varianti di pulizia, quindi la trascrizione usa sempre l'originale;
+- esportazione per la perizia (#40) e app Tauri (#37-#39);
+- soglie (allineamento -1,0, candidate, impronta) tarate su dati sintetici o su pochi clip reali: da confermare sul banco di prova (#48).
 
 ---
 
