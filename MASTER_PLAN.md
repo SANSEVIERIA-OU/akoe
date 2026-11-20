@@ -480,19 +480,21 @@ Si estende dai file audio a profili, adattatori, lessico e risultati dell'autova
 
 ## 6. Implementazione: stato attuale
 
-Verificato il 2026-05-25; il codice è invariato al 2026-11-20.
+Aggiornato il 2026-11-20. Repository privato `SANSEVIERIA-OU/whisper`; dettaglio per modulo in `IMPLEMENTATION_PLAN.md` (sezioni 3 e 4) e nelle issue.
 
-**Funziona** in modalità FORENSIC su EDGE: preprocessing, riduzione del rumore deterministica (noisereduce), rilevamento della voce a energia, catena di custodia. 2 test pytest verdi, circa 400 righe di codice.
+**Motore completo, collegato end-to-end** (`engine.py`, raggiungibile da API e CLI):
+- casi con reperti in sola lettura e hash, coppie locale/trasmesso, ruolo "riferimento" per il materiale del soggetto;
+- modello del soggetto multi-contesto: import per condizione, allineamento CTC dei testi, divisione per registrazione, profilo timbrico, impronta vocale (ReDimNet-B2 raccomandato, ECAPA-TDNN di riferimento) con calibrazione leave-one-recording-out, ciclo di verifica;
+- profilo del veicolo misurato (runbook e strumenti di misura) o stimato; simulazione del canale; codec variabili (G.711, GSM, MP3, Opus, Vorbis, AMR-NB, AAC; AMR-WB se c'è l'encoder); allineamento e stima del canale tra registrazione locale e trasmessa;
+- pulizia: bande SII, riduzione del rumore offline, armoniche del motore, cancellazione di radio/musica con riferimento, pulizia d'ascolto NMF del soggetto, rimescolamento, rilevatore di voce robusto;
+- trascrizione con alternative: Whisper (N-best vero, campionamento, decoder forzato, adattatori), Parakeet via NeMo (codice pronto, 0.6B v3 non ancora eseguito per limiti di RAM), combinazione stile ROVER, guardia contro le allucinazioni, lessico con letture con/senza; punteggio "X o Y?" con CTC e Whisper separati;
+- adattamento: dati multi-contesto dai soli tratti verificati, LoRA o completo, adattatori con hash verificati al caricamento;
+- autovalutazione per caso e per condizione con sintesi in italiano;
+- API con token, job per ogni flusso, streaming audio etichettato.
 
-**Non implementati:** gli stadi neurali (`denoise.run_neural`, `embedding.run`, `extract.run`, `asr.run`) sollevano `NotImplementedError`, registrato nel log come "skipped".
+**Verifiche:** 338 test rapidi e 9 lenti. Il test lento end-to-end usa un clip italiano reale in rumore d'auto sintetico, whisper-tiny, il modello CTC italiano ed ECAPA: frase trascritta correttamente, frase vera prima per entrambi i punteggi; un adattatore addestrato per 2 passi peggiora nettamente e l'autovalutazione lo rileva.
 
-**Cosa cambia:**
-- **Resta:** catena di custodia, modelli dati, preprocessing, pulizia deterministica, rilevamento della voce, CLI (come strumento di sviluppo).
-- **Si accantona:** `extract.py` (TSE), per lo scenario primario.
-- **Si riusa con un nuovo scopo:** `embedding.py` diventa l'impronta vocale.
-- **Si aggiunge:** profilo del soggetto, profilo del veicolo, pulizia specifica per l'auto, adattamento, trascrizione con alternative, confronto tra candidate, autovalutazione, API del motore, app Tauri.
-
-Il piano operativo è in `IMPLEMENTATION_PLAN.md`.
+**Limiti attuali:** tutte le soglie sono tarate su segnali sintetici o pochi clip pubblici; la qualità reale va misurata sul banco di prova (#48). Mancano l'app Tauri (M7, percorso di design da avviare), la distribuzione per livelli (M8) e l'esecuzione di Parakeet-TDT 0.6B v3.
 
 ---
 
