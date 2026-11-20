@@ -36,3 +36,4 @@ models/
 # App build artifacts
 node_modules/
 target/
+.claude/
