@@ -15,6 +15,14 @@ from akoe.config import (
 )
 
 app = typer.Typer(help="Akoe — assisted transcription adapted to the subject and the vehicle.")
+
+
+@app.callback()
+def _load_local_settings() -> None:
+    """Read the local .env (e.g. HF_TOKEN, HF_HOME) before any command."""
+    from akoe.settings import load_env
+
+    load_env()
 case_app = typer.Typer(help="Case management: layout, read-only evidence import, verification.")
 app.add_typer(case_app, name="case")
 
