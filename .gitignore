@@ -1,0 +1,38 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.ipynb_checkpoints/
+build/
+dist/
+
+# Case artifacts: never commit evidence or outputs
+data/
+out/
+*.wav
+*.flac
+*.mp3
+*.npy
+transcript.json
+processing_log.json
+*.ogg
+*.opus
+*.m4a
+*.amr
+*.aac
+*.gsm
+
+# Cases, model weights, caches
+cases/
+models/
+*.safetensors
+*.pt
+*.ckpt
+*.onnx
+.pytest_cache/
+.env
+.env.*
+
+# App build artifacts
+node_modules/
+target/
