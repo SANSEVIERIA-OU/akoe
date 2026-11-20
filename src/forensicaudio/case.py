@@ -20,7 +20,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from forensicaudio.config import RecordingSource
-from forensicaudio.models import ArtifactRef, EvidenceItem, RecordingCondition
+from forensicaudio.models import ArtifactRef, EvidenceItem, EvidenceRole, RecordingCondition
 from forensicaudio.utils import sha256_file
 
 CASE_SUBDIRS = ("evidence", "working", "profiles", "adapters", "outputs", "logs")
@@ -79,6 +79,7 @@ class Case:
         src: Path,
         condition: RecordingCondition | None = None,
         pair_id: str | None = None,
+        role: EvidenceRole = EvidenceRole.UNDER_ANALYSIS,
     ) -> EvidenceItem:
         """Copy a recording into evidence/, verify the copy, make it read-only.
 
@@ -107,6 +108,7 @@ class Case:
             ),
             condition=condition or RecordingCondition(),
             pair_id=pair_id,
+            role=role,
         )
         self.manifest.evidence.append(item)
         self.save()

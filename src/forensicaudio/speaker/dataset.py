@@ -81,7 +81,7 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError
 
 from forensicaudio.case import Case
 from forensicaudio.config import Channel, RecordingSource, VocalEffort
-from forensicaudio.models import ArtifactRef, DatasetItem, DatasetSplit, RecordingCondition
+from forensicaudio.models import ArtifactRef, DatasetItem, DatasetSplit, EvidenceRole, RecordingCondition
 from forensicaudio.speaker._io import (
     check_id,
     load_audio,
@@ -520,7 +520,7 @@ class SubjectDataset(BaseModel):
         if cond.sample_rate is None:
             cond.sample_rate = sample_rate
 
-        ev = case.import_evidence(audio_path, cond, pair_id=pair_id)
+        ev = case.import_evidence(audio_path, cond, pair_id=pair_id, role=EvidenceRole.REFERENCE)
         rec = RecordingEntry(
             recording_id=ev.evidence_id,
             original_name=audio_path.name,

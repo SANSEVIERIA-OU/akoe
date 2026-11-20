@@ -102,6 +102,11 @@ class RecordingCondition(BaseModel):
         )
 
 
+class EvidenceRole(str, Enum):
+    UNDER_ANALYSIS = "under_analysis"  # recordings to be transcribed
+    REFERENCE = "reference"  # the subject's known speech, used to build his model
+
+
 class EvidenceItem(BaseModel):
     evidence_id: str
     original_name: str
@@ -109,6 +114,7 @@ class EvidenceItem(BaseModel):
     condition: RecordingCondition = Field(default_factory=RecordingCondition)
     # Local and transmitted recordings of the same event share a pair_id.
     pair_id: str | None = None
+    role: EvidenceRole = EvidenceRole.UNDER_ANALYSIS
     imported_at: datetime = Field(default_factory=_now)
 
 
@@ -216,6 +222,7 @@ class SpeakerProfile(BaseModel):
     conditions: list[ConditionProfile] = Field(default_factory=list)
     dataset_manifest: ArtifactRef | None = None
     holdout_recordings: list[str] = Field(default_factory=list)
+    calibration: ArtifactRef | None = None  # score calibration on case material
     created_at: datetime = Field(default_factory=_now)
 
 

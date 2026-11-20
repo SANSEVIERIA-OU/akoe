@@ -55,3 +55,12 @@ def test_pairs_prefer_local_recording(tmp_path):
     assert case.preferred_input("evt-1") == loc
     with pytest.raises(CaseError):
         case.preferred_input("missing")
+
+
+def test_reference_role(tmp_path):
+    from forensicaudio.models import EvidenceRole
+
+    case = Case.create(tmp_path / "c", "c")
+    ref = case.import_evidence(_rec(tmp_path / "phone.wav", b"subject on the phone"), role=EvidenceRole.REFERENCE)
+    ev = case.import_evidence(_rec(tmp_path / "car.wav", b"car recording"))
+    assert ref.role == EvidenceRole.REFERENCE and ev.role == EvidenceRole.UNDER_ANALYSIS
