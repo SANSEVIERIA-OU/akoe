@@ -286,6 +286,21 @@ Implicazione per il prodotto: revisione cieca come impostazione predefinita. Il 
 - **Siciliano e calabrese.** Nessun corpus o modello verificato; i corpus Primula e SoPhISM sono solo citati.
 - **Implicazione.** Il materiale reale del soggetto, trascritto nel suo dialetto, è la risorsa principale. Le trascrizioni esistenti vanno controllate, per non insegnare al modello a italianizzare.
 
+### 3.11 Modelli migliori disponibili (ricerca del 2026-11-20)
+
+Criterio del proprietario: il migliore disponibile al mondo, che giri su macchine controllate. Il catalogo per livello è in `docs/catalogo_modelli.md`. Sintesi:
+- **Trascrizione italiana (pesi aperti).**
+  - Nemotron 3.5 Transcribe (NVIDIA, ottobre 2026): FLEURS-it 1,39; media della classifica 3,61; 67 GB, solo cloud.
+  - Cohere Transcribe 03-2026: 2B, Apache-2.0, media 3,44, gira anche su CPU.
+  - Qwen3-ASR-1.7B: FLEURS-it 2,41, il più robusto al rumore nel test URGENT 2024 (inglese, 9,93 contro 13,73 di Whisper large-v3).
+  - omniASR-LLM-7B e Voxtral Small 24B (media 3,75); Parakeet-TDT 0.6B v3 (FLEURS-it 3,00); Whisper large-v3 (media 4,45).
+  - I modelli chiusi (ElevenLabs Scribe v2, Azure) hanno numeri migliori ma sono esclusi dal vincolo. Nessuna misura italiana in rumore o in auto per nessuno.
+- **Impronta vocale.** ReDimNet2-B6 (MIT, 12,3M, Vox1-O 0,23–0,29%); w2v-BERT 2.0 SV (0,12%, ~600M). Nei test sullo sforzo vocale la famiglia ReDimNet è la più robusta (Lombard: EER 0,50/0,89 contro 1,68/2,50 di ECAPA-TDNN; sussurro: 6,77 contro 10,49). Codec a bitrate molto basso degradano tutti i modelli (ECAPA-TDNN da 0,86 a 11,75 con Opus 1,5 kbps). Ricetta di punteggio WeSpeaker: AS-norm e QMF.
+- **CTC italiano.** omniASR CTC 1B/3B v2 (FLEURS-it 3,9/1,3% su un campione minimo); wav2vec2-xls-r-1b-italian (CV8 9,04/2,20).
+- **Pulizia d'ascolto.** UniPASE (MIT) ha la minore distorsione del contenuto, misurata come dWER; i generativi puri mostrano molte allucinazioni (URGENT 2025: un sistema generativo con MOS alto ma ESTOI 0,53 contro 0,82). GTCRN e DeepFilterNet per la CPU.
+- **VAD.** Silero VAD 6.2.3 (MIT); FireRedVAD (Apache-2.0). Nessun benchmark in rumore d'auto.
+- **Limiti.** Le classifiche italiane sono medie su dataset discussi e snapshot diversi; le misure CPU sono di terze parti. Va tutto rimisurato nell'autovalutazione e sul banco di prova.
+
 ### 3.10 Modelli candidati (censimento maggio 2026)
 
 Le tabelle di pulizia, TSE e trascrizione italiana del 2026-05-25 sono nell'Appendice D. Restano valide come elenco di candidati, con due note:
@@ -588,6 +603,7 @@ Due livelli: l'autovalutazione per caso (4.7) e la valutazione durante lo svilup
 | 2026-11-20 | Licenza SANSEVIERIA License 1.1 (LICENSE, NOTICE, THIRD_PARTY_NOTICES, CONTRIBUTING, intestazione SPDX in ogni file) | Richiesta del proprietario, come gli altri progetti SANSEVIERIA | Deciso |
 | 2026-11-20 | Criterio di scelta dei modelli: il migliore disponibile al mondo, con l'unico vincolo di girare su macchine controllate (portatile, workstation, cloud dell'utente) | Richiesta del proprietario | Deciso |
 | 2026-11-20 | Pesi pubblicati senza licenza propria in un repository con licenza dichiarata: si considerano coperti dalla licenza del repository (es. ReDimNet, MIT) | Decisione del proprietario | Deciso |
+| 2026-11-20 | Catalogo modelli per livello (`docs/catalogo_modelli.md`): trascrizione Cohere Transcribe + Qwen3-ASR + Parakeet su tutti i livelli, Nemotron 3.5 Transcribe in cloud, Whisper per l'adattamento; impronta ReDimNet2-B6 (w2v-BERT 2.0 per la massima accuratezza); CTC omniASR; pulizia d'ascolto UniPASE/GTCRN; Silero VAD | Ricerca del 2026-11-20 (3.11) e criterio "il migliore disponibile" | Deciso; backend da implementare |
 
 ---
 
