@@ -85,9 +85,10 @@ CODEC_SPECS: tuple[CodecSpec, ...] = (
               ff_encoder="aac", ff_format="adts", ff_demuxer="aac"),
 )
 
-# Codecs drawn by default (MASTER_PLAN §4.3). AAC is registered but opt-in.
+# Codecs drawn by default (MASTER_PLAN §4.3). The device's transmission codecs
+# vary, so the default set is broad, AAC included (decision 2026-11-20).
 DEFAULT_CODECS: tuple[str, ...] = (
-    "g711_ulaw", "g711_alaw", "gsm", "mp3", "opus", "vorbis", "amr_nb", "amr_wb",
+    "g711_ulaw", "g711_alaw", "gsm", "mp3", "opus", "vorbis", "amr_nb", "amr_wb", "aac",
 )
 
 
