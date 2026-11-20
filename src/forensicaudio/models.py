@@ -314,6 +314,14 @@ class ProcessingLog(BaseModel):
     # Derived artifacts beyond audio: profiles, adapters, lexicon, assessments.
     artifacts: list[ArtifactRef] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=_now)
+    # Case workflows (engine.py): which workflow, its parameters, the hashed
+    # inputs it read, operator-facing notes (Italian) and the end time.
+    workflow: str | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    inputs: list[ArtifactRef] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    engine_version: str | None = None
+    finished_at: datetime | None = None
 
     def register(self, artifact: ArtifactRef) -> None:
         self.artifacts.append(artifact)

@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import stat
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,12 +36,43 @@ class CaseManifest(BaseModel):
     case_id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     evidence: list[EvidenceItem] = Field(default_factory=list)
+    # Processing logs of the case workflows (engine.py), with their SHA-256.
+    logs: list[ArtifactRef] = Field(default_factory=list)
+
+
+_LOCKS: dict[str, threading.RLock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for(root: Path) -> threading.RLock:
+    key = str(Path(root).resolve())
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(key, threading.RLock())
 
 
 class Case:
     def __init__(self, root: Path, manifest: CaseManifest) -> None:
         self.root = root
         self.manifest = manifest
+
+    def lock(self) -> threading.RLock:
+        """Process-wide lock of this case folder: manifest updates from
+        concurrent jobs (API) are read-modify-write under it."""
+        return _lock_for(self.root)
+
+    def refresh(self) -> None:
+        """Reload the manifest from disk (another Case object may have saved it)."""
+        path = self.root / MANIFEST
+        if path.exists():
+            self.manifest = CaseManifest.model_validate_json(path.read_text())
+
+    def register_log(self, ref: ArtifactRef) -> None:
+        """Record a processing log (path relative to the case root, SHA-256) in the manifest."""
+        with self.lock():
+            self.refresh()
+            if not any(r.path == ref.path and r.sha256 == ref.sha256 for r in self.manifest.logs):
+                self.manifest.logs.append(ref)
+                self.save()
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -88,13 +120,29 @@ class Case:
         if not src.is_file():
             raise CaseError(f"not a file: {src}")
         digest = sha256_file(src)
-        for item in self.manifest.evidence:
-            if item.artifact.sha256 == digest:
-                return item
+        with self.lock():
+            self.refresh()
+            for item in self.manifest.evidence:
+                if item.artifact.sha256 == digest:
+                    return item
+            return self._import_new(src, digest, condition, pair_id, role)
 
+    def _import_new(
+        self,
+        src: Path,
+        digest: str,
+        condition: RecordingCondition | None,
+        pair_id: str | None,
+        role: EvidenceRole,
+    ) -> EvidenceItem:
         evidence_id = f"ev-{digest[:12]}"
         dest = self.dir("evidence") / f"{evidence_id}{src.suffix.lower()}"
-        shutil.copyfile(src, dest)
+        if dest.exists():  # left by an interrupted import: replace only if it differs
+            if sha256_file(dest) != digest:
+                dest.chmod(stat.S_IRUSR | stat.S_IWUSR)
+                dest.unlink()
+        if not dest.exists():
+            shutil.copyfile(src, dest)
         if sha256_file(dest) != digest:
             dest.unlink(missing_ok=True)
             raise CaseError(f"copy of {src} does not match the original hash")

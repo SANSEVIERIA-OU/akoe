@@ -680,12 +680,21 @@ class SubjectDataset(BaseModel):
             text = normalize_text(" ".join(it.text for it in pending))
             if not text:
                 continue
+            if not rec.audio.verify(case.root):
+                self._record(
+                    "alignment_failed", Severity.ERROR,
+                    f"{rec.original_name}: audio mancante o modificato (SHA-256), allineamento non eseguito",
+                    recording_id=rid,
+                )
+                continue
             audio = load_audio(rec.audio.resolve(case.root), sr)
             spans = aligner.align(audio, sr, text)
             if not spans:
+                reasons = (getattr(aligner, "last_report", None) or {}).get("warnings") or []
+                detail = f": {'; '.join(reasons)}" if reasons else ""
                 self._record(
                     "alignment_failed", Severity.ERROR,
-                    f"{rec.original_name}: allineamento non riuscito ({aligner.name})", recording_id=rid,
+                    f"{rec.original_name}: allineamento non riuscito ({aligner.name}){detail}", recording_id=rid,
                 )
                 continue
             if any(it.verified for it in pending):
