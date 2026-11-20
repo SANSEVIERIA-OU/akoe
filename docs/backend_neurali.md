@@ -45,6 +45,19 @@ Non verificate le condizioni dei dati di addestramento (Common Voice, Granary).
   - **Frase vera contro tre frasi alterate** (parole scambiate, tolte o sostituite): la vera è prima in 11 casi su 13. Nei 2 casi restanti l'alterazione tocca una parola che il modello sente diversamente dal riferimento ("voglio", "mago"), probabile imprecisione del riferimento; lo scarto è minimo (0,02 e 0,0003).
   - **Costi:** circa 6 s per clip di 8-18 s; picco di memoria residente 4,6 GB, con i pesi mappati dal file.
 
+## XLS-R 1B italiano per l'allineamento (issue #58)
+
+- **Pesi:** `jonatasgrosman/wav2vec2-xls-r-1b-italian` @ `02d4be26`, solo `pytorch_model.bin`. Il file è caricato da transformers con `weights_only`; lo SHA-256 `6330c052…15d2` è uguale all'oggetto LFS dell'hub.
+- **Prova sulle stesse 13 clip e con le stesse frasi alterate** usate per omniASR:
+  - CER greedy medio 8,9% (2,6% su Common Voice);
+  - frase vera prima in 12 casi su 13.
+- **Allineatore delle trascrizioni:**
+  - il testo giusto ha un punteggio complessivo tra −0,15 e −1,56;
+  - il testo di un'altra clip, sullo stesso audio, ha un punteggio tra −3,8 e −8,0;
+  - il testo giusto è sopra quello sbagliato in 13 casi su 13.
+  La soglia `DEFAULT_MIN_SCORE` (−1,0) segnala due clip giuste al telefono (−1,44 e −1,56), entrambe con riferimento impreciso: va tarata sul materiale del caso.
+- **Costi:** circa 6 s per clip; picco di memoria residente 4,6 GB.
+
 ## Whisper (`whisper_backend.py`)
 
 - **Alternative.** Le N migliori ipotesi vengono dal beam search, più eventuali campioni con temperatura e soglia epsilon (seme registrato).
