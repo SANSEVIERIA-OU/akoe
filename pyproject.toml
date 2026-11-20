@@ -1,7 +1,7 @@
 [project]
 name = "forensicaudio"
 version = "0.0.1"
-description = "Audio enhancement and target-speaker extraction for forensic / investigative use"
+description = "Assisted transcription adapted to the subject and the vehicle, for covert recordings"
 requires-python = ">=3.11"
 dependencies = [
     "typer>=0.12",
@@ -11,15 +11,31 @@ dependencies = [
     "soundfile>=0.12",
     "librosa>=0.10",
     "noisereduce>=3.0",
+    "scikit-learn>=1.4",
 ]
 
 [project.optional-dependencies]
+# Neural backends (CPU wheels work on EDGE; CUDA builds on WORKSTATION/CLOUD).
 ml = [
-    "torch>=2.2",
+    "torch>=2.5",
+    "torchaudio>=2.5",
+    "transformers>=4.45",
+    "peft>=0.13",
+    "accelerate>=1.0",
     "speechbrain>=1.0",
-    "deepfilternet>=0.5",
     "faster-whisper>=1.0",
-    "pyannote.audio>=3.1",
+    "sentencepiece>=0.2",
+]
+# NVIDIA NeMo for Parakeet-TDT / Canary (heavy; install separately).
+ml-nemo = [
+    "nemo-toolkit[asr]>=2.0",
+]
+# Evaluation and codec simulation helpers.
+assess = [
+    "jiwer>=3.0",
+]
+codecs = [
+    "imageio-ffmpeg>=0.5",
 ]
 dev = [
     "pytest>=8.0",
@@ -44,3 +60,5 @@ target-version = "py311"
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+markers = ["slow: needs real models or downloads (deselected by default)"]
+addopts = "-m 'not slow'"

@@ -68,3 +68,28 @@ def test_investigative_mode_skips_unimplemented_stages(tmp_path: Path) -> None:
     assert "denoise_neural_skipped" in stages
     # No enhanced_neural.wav because the neural branch was skipped.
     assert "enhanced_neural" not in log.output_files
+
+
+def test_tier_and_profile_are_recorded(tmp_path: Path) -> None:
+    from forensicaudio.config import RunProfile, Tier
+    from scripts.synth_test_audio import main as synth
+
+    data_root = tmp_path / "data"
+    synth(out_root=data_root)
+    cfg = CaseConfig(
+        case_id="smoke_003",
+        evidence_path=data_root / "evidence.wav",
+        speaker_samples_dir=data_root / "speaker_samples",
+        output_dir=tmp_path / "out",
+        mode=Mode.BOTH,
+        tier=Tier.WORKSTATION,
+        profile=RunProfile.VEHICLE_SINGLE_SPEAKER,
+    )
+    log = process(cfg)
+    assert log.tier == Tier.WORKSTATION and log.profile == RunProfile.VEHICLE_SINGLE_SPEAKER
+    assert all(s.tier == Tier.WORKSTATION for s in log.stages)
+    # Vehicle profile: no target speaker extraction, ASR input is the original audio.
+    names = [s.name for s in log.stages]
+    assert not any(n.startswith("extract_target_speaker") for n in names)
+    asr = next(s for s in log.stages if s.name == "asr_skipped")
+    assert asr.params["asr_input_variant"] == "original"
