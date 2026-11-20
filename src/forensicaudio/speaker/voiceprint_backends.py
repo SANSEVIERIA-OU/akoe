@@ -262,3 +262,20 @@ class ReDimNetVoiceprint:
         with torch.inference_mode():
             emb = self._model(torch.from_numpy(a)[None].to(self._provenance.device))
         return emb.reshape(-1).cpu().numpy().astype(np.float32)
+
+
+DEFAULT_VOICEPRINT = "redimnet-b2"
+
+
+def default_voiceprint_backend(name: str | None = None, *, device: str = "cpu") -> Any:
+    """The project's voiceprint backend (docs/decisione_impronta_vocale.md):
+    ReDimNet-B2 by default, ECAPA-TDNN as the independent reference
+    (``name="ecapa"``). Nothing is loaded until the first `embed()`."""
+    key = (name or DEFAULT_VOICEPRINT).lower()
+    if key in ("redimnet", "redimnet-b2", "b2"):
+        return ReDimNetVoiceprint(device=device)
+    if key in ("redimnet-b6", "b6"):
+        return ReDimNetVoiceprint(model_name="b6", device=device)
+    if key in ("ecapa", "ecapa-tdnn"):
+        return EcapaVoiceprint(device=device)
+    raise ValueError(f"Modello di impronta vocale sconosciuto: {name!r} (redimnet-b2, redimnet-b6, ecapa)")

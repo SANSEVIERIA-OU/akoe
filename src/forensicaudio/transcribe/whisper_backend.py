@@ -587,6 +587,22 @@ class WhisperHFBackend:
         return results
 
 
+    def lexicon_decoder(self, terms: Any, config: Any = None, *, num_beams: int = 1) -> Any:
+        """`adapt.lexicon.WhisperLexiconDecoder` over this backend's loaded model
+        (base or adapted), for the with/without-lexicon readings (issue #26)."""
+        from transformers import WhisperProcessor
+
+        from forensicaudio.adapt.lexicon import WhisperLexiconDecoder
+
+        if self._model is None:
+            self.load()
+        processor = WhisperProcessor(feature_extractor=self._fe, tokenizer=self._tok)
+        return WhisperLexiconDecoder(
+            self._model, processor, terms, config, language=self.language, task=self.task,
+            num_beams=num_beams, max_new_tokens=self.max_new_tokens,
+        )
+
+
 class WhisperDecoderScorer:
     """`CandidateScorer` view of a Whisper backend: score = mean per-token
     log-probability of the candidate under the decoder (teacher-forced)."""
