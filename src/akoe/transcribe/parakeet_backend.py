@@ -126,6 +126,14 @@ class ParakeetTDTBackend:
         assert self._provenance is not None
         return self._provenance
 
+    def unload(self) -> None:
+        """Free the weights (provenance is kept; the next call reloads)."""
+        import gc
+
+        with self._lock:
+            self._model = self._greedy_cfg = None
+        gc.collect()
+
     def _resolve_nemo(self) -> tuple[Path, str | None]:
         p = Path(self.model_id).expanduser()
         if p.suffix == ".nemo" and p.is_file():

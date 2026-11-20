@@ -12,7 +12,8 @@ Used by both the engine API (`api/server.py`) and the CLI (`cli.py`):
 - `clean`: listening variants for the human transcriber, each a separate,
   labelled artifact (never merged with neural audio);
 - `transcribe`: original audio (local recording of a pair first) -> robust VAD
-  -> ASR backends (generic, adapted, Parakeet), optional lexicon readings ->
+  -> ASR ensemble (Cohere, Qwen3-ASR, Parakeet, Whisper generic/adapted,
+  Nemotron on CLOUD), optional lexicon readings ->
   combine -> hallucination guard -> `HypothesisTranscript`;
 - `score_candidates`: "did he say X or Y?", every scorer reported separately;
 - `train_subject_adapter`: verified training items, vehicle channel + variable
@@ -342,19 +343,50 @@ def default_whisper_model(tier: Tier) -> str:
     return "openai/whisper-small" if tier == Tier.EDGE else "openai/whisper-large-v3"
 
 
+# Transcriber families of the ASR ensemble (docs/catalogo_modelli.md). Order
+# matters: the first source that runs is the skeleton of the word alignment.
+ASR_SYSTEMS = ("nemotron", "cohere", "qwen3", "parakeet", "whisper")
+ASR_ENSEMBLE_ENV = "AKOE_ASR_ENSEMBLE"
+
+
+def default_asr_ensemble(tier: Tier) -> tuple[str, ...]:
+    """Cohere Transcribe + Qwen3-ASR + Parakeet (when NeMo is installed) +
+    Whisper on every tier; Nemotron 3.5 Transcribe first on CLOUD."""
+    base = ("cohere", "qwen3", "parakeet", "whisper")
+    return ("nemotron", *base) if tier == Tier.CLOUD else base
+
+
+def parse_asr_ensemble(value: str | Sequence[str]) -> tuple[str, ...]:
+    names = [v.strip().lower() for v in (value.split(",") if isinstance(value, str) else value) if v.strip()]
+    unknown = [n for n in names if n not in ASR_SYSTEMS]
+    if unknown or not names:
+        raise EngineError(f"Trascrittori sconosciuti: {', '.join(unknown) or '(nessuno)'}; "
+                          f"disponibili: {', '.join(ASR_SYSTEMS)}")
+    return tuple(dict.fromkeys(names))
+
+
 class DefaultBackends:
     """Real models (lazy, cached per process): ReDimNet-B2 voiceprint, Italian
-    CTC model for alignment and candidate scoring, Whisper generic / adapted,
-    Parakeet-TDT when NeMo is installed, LoRA trainer."""
+    CTC model for alignment and candidate scoring, the ASR ensemble (Cohere
+    Transcribe, Qwen3-ASR, Parakeet-TDT when NeMo is installed, Whisper
+    generic / adapted, Nemotron on CLOUD), LoRA trainer.
+
+    `asr_ensemble` (or the AKOE_ASR_ENSEMBLE variable, comma-separated) selects
+    the transcribers; default `default_asr_ensemble(tier)`. With `low_memory`
+    (default) every heavy model is released after its turn in `transcribe`,
+    so the peak RAM is that of the largest model, not the sum (EDGE: 14 GB)."""
 
     def __init__(self, *, device: str = "cpu", voiceprint_name: str | None = None,
                  ctc_model: str | None = None, whisper_model: str | None = None,
-                 local_files_only: bool = False) -> None:
+                 local_files_only: bool = False, asr_ensemble: str | Sequence[str] | None = None,
+                 low_memory: bool = True) -> None:
         self.device = device
         self.voiceprint_name = voiceprint_name
         self.ctc_model = ctc_model
         self.whisper_model = whisper_model
         self.local_files_only = local_files_only
+        self.asr_ensemble = parse_asr_ensemble(asr_ensemble) if asr_ensemble is not None else None
+        self.low_memory = low_memory
         self._cache: dict[tuple, Any] = {}
         self._lock = threading.RLock()  # re-entrant: a factory may need another backend (aligner -> CTC)
 
@@ -413,19 +445,50 @@ class DefaultBackends:
 
         return self._get(("adapted", art.adapter_id, adapter.artifact_ref.sha256), build)
 
+    def ensemble(self, tier: Tier) -> tuple[str, ...]:
+        if self.asr_ensemble is not None:
+            return self.asr_ensemble
+        env = os.environ.get(ASR_ENSEMBLE_ENV)
+        return parse_asr_ensemble(env) if env else default_asr_ensemble(tier)
+
     def asr(self, *, tier: Tier, adapter: VerifiedAdapter | None = None,
             whisper_model: str | None = None) -> dict[str, ASRBackend]:
+        """Labels: "nemotron", "cohere", "qwen3", "parakeet", "generic" and
+        "adapted" (Whisper). The adapted Whisper (the subject model) is
+        included whenever a verified adapter is given."""
+        from akoe.transcribe.cohere_backend import CohereTranscribeBackend
+        from akoe.transcribe.nemotron_backend import NemotronTranscribeBackend
         from akoe.transcribe.parakeet_backend import ParakeetTDTBackend, nemo_available
+        from akoe.transcribe.qwen3_backend import Qwen3ASRBackend
 
         base = (whisper_model or (adapter.artifact.base_model if adapter else None)
                 or self.whisper_model or default_whisper_model(tier))
-        out: dict[str, ASRBackend] = {"generic": self.whisper(base)}
+        kw = {"local_files_only": self.local_files_only}
+        out: dict[str, ASRBackend] = {}
+        for system in self.ensemble(tier):
+            if system == "nemotron":
+                device = "cuda" if self.device == "cpu" else self.device  # refuses with a reason without a GPU
+                out["nemotron"] = self._get(("nemotron", device), lambda d=device: NemotronTranscribeBackend(
+                    device=d, aligner=self.aligner, **kw))
+            elif system == "cohere":
+                out["cohere"] = self._get(("cohere",), lambda: CohereTranscribeBackend(
+                    device=self.device, aligner=self.aligner, low_memory=self.low_memory, **kw))
+            elif system == "qwen3":
+                out["qwen3"] = self._get(("qwen3",), lambda: Qwen3ASRBackend(
+                    device=self.device, low_memory=self.low_memory, **kw))
+            elif system == "parakeet":
+                if nemo_available():
+                    out["parakeet"] = self._get(("parakeet",), lambda: ParakeetTDTBackend(device=self.device, **kw))
+            elif system == "whisper":
+                out["generic"] = self.whisper(base)
         if adapter is not None:
             out["adapted"] = self.adapted_whisper(adapter)
-        if nemo_available():
-            out["parakeet"] = self._get(("parakeet",), lambda: ParakeetTDTBackend(
-                device=self.device, local_files_only=self.local_files_only))
         return out
+
+    def release(self, backend: Any) -> None:
+        """Free a backend's weights after its turn (low_memory); it reloads lazily if used again."""
+        if self.low_memory and hasattr(backend, "unload"):
+            backend.unload()
 
     def scorers(self, *, tier: Tier, whisper_model: str | None = None) -> list[CandidateScorer]:
         from akoe.transcribe.whisper_backend import WhisperDecoderScorer
@@ -1415,6 +1478,7 @@ def transcribe(
     subject_id: str | None = None,
     voiceprint: VoiceprintBackend | None = None,
     whisper_model: str | None = None,
+    asr_systems: Sequence[str] | None = None,
     n_best: int = 5,
     vad_params: Mapping[str, Any] | None = None,
     segment_pad_s: float = 0.1,
@@ -1430,9 +1494,12 @@ def transcribe(
     a local/transmitted pair (the local recording is preferred).
 
     The ASR input is the ORIGINAL audio (audio_provenance DETERMINISTIC). The
-    robust VAD gives the regions; every backend runs on them (default:
-    Whisper generic, plus the adapted Whisper when a verified adapter is
-    given, plus Parakeet when NeMo is installed). With a lexicon, each
+    robust VAD gives the regions; every backend runs on them (default: the
+    provider's ensemble, `default_asr_ensemble(tier)`: Cohere Transcribe,
+    Qwen3-ASR, Parakeet when NeMo is installed, Whisper generic, plus the
+    adapted Whisper when a verified adapter is given; Nemotron first on
+    CLOUD). `asr_systems` keeps only the given labels ("cohere", "qwen3",
+    "parakeet", "generic", "adapted", "nemotron"). With a lexicon, each
     backend that can decode with it adds the reading "with lexicon" as a
     separate source (weight `lexicon_weight`, 0 by default: it is shown and
     flagged, never voted into the consensus). Sources are combined word by
@@ -1452,7 +1519,7 @@ def transcribe(
     params = {"evidence_id": evidence_id, "pair_id": pair_id, "adapter": str(adapter) if adapter else None,
               "lexicon": None if lexicon is None else str(getattr(lexicon, "lexicon_id", lexicon)),
               "lexicon_weight": lexicon_weight, "subject_id": subject_id, "whisper_model": whisper_model,
-              "n_best": n_best, "vad_params": dict(vad_params or {}), "segment_pad_s": segment_pad_s,
+              "asr_systems": list(asr_systems) if asr_systems is not None else None, "n_best": n_best, "vad_params": dict(vad_params or {}), "segment_pad_s": segment_pad_s,
               "audio_variant": "original", "audio_provenance": StageKind.DETERMINISTIC.value}
     wl = WorkflowLog(case, "transcribe", mode=mode, tier=tier, parameters=params)
     if pair_id is not None:
@@ -1486,6 +1553,14 @@ def transcribe(
 
     systems = _systems(backends) if backends is not None else list(
         _provider(provider).asr(tier=tier, adapter=verified, whisper_model=whisper_model).items())
+    if asr_systems is not None:
+        wanted = set(asr_systems)
+        unknown = wanted - {label for label, _ in systems}
+        if unknown:
+            wl.note(f"Trascrittori richiesti ma non configurati: {', '.join(sorted(unknown))}")
+        systems = [(label, b) for label, b in systems if label in wanted]
+    # Provider-owned models are released after their turn (low-memory ensembles on EDGE).
+    release = getattr(_provider(provider), "release", None) if backends is None else None
     sources: list[Any] = []
     ok_systems: list[tuple[str, ASRBackend]] = []
     expected = StageKind.DETERMINISTIC
@@ -1498,6 +1573,9 @@ def transcribe(
             wl.skipped(f"asr:{label}", StageKind.NEURAL, {"backend": backend.name},
                        f"Trascrittore {label} non disponibile: {e or 'non implementato'}", started)
             continue
+        finally:
+            if release is not None:
+                release(backend)  # reloaded lazily if the lexicon reading needs it
         fixed = 0
         for seg in segs:
             if seg.audio_provenance != expected:
@@ -1919,7 +1997,9 @@ def self_assess(
     if lex is not None and lex.terms():
         wl.input("lexicon", lex_ref)  # type: ignore[arg-type]
         terms = lex.terms()
-        first_label, first = next(iter(systems.items()))
+        # first system able to decode with the lexicon (Whisper); else the first one, for the note
+        first_label, first = next(((k, b) for k, b in systems.items() if hasattr(b, "lexicon_decoder")),
+                                  next(iter(systems.items())))
         dec = _lexicon_decoder_for(first, lex)
         if dec is not None:
             systems[f"{first_label}+lexicon"] = LexiconASR(first, dec)
@@ -2049,9 +2129,10 @@ def read_self_assessment(case: Case, subject_id: str) -> tuple[SelfAssessment, s
 
 
 __all__ = [
-    "BackendProvider", "DefaultBackends", "EngineError", "LISTENING_VARIANTS", "LexiconASR", "RecordingSpec",
-    "SubjectModelState", "VehicleChannelAugment", "VerifiedAdapter", "WorkflowLog", "WorkflowResult",
-    "build_subject_model", "build_vehicle_profile", "channel_augment_for", "clean", "get_backend_provider",
+    "ASR_SYSTEMS", "BackendProvider", "DefaultBackends", "EngineError", "LISTENING_VARIANTS", "LexiconASR",
+    "RecordingSpec", "SubjectModelState", "VehicleChannelAugment", "VerifiedAdapter", "WorkflowLog", "WorkflowResult",
+    "build_subject_model", "build_vehicle_profile", "channel_augment_for", "clean", "default_asr_ensemble",
+    "get_backend_provider",
     "listening_index", "load_subject_model", "load_vehicle_profile", "read_self_assessment", "read_transcript",
     "resolve_adapter", "score_candidates", "self_assess", "set_backend_provider", "train_subject_adapter",
     "transcribe", "verified_evidence",

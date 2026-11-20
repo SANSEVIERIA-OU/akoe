@@ -316,6 +316,14 @@ class WhisperHFBackend:
                    "attn_implementation": attn},
         )
 
+    def unload(self) -> None:
+        """Free the weights (provenance is kept; the next call reloads)."""
+        import gc
+
+        with self._lock:
+            self._model = self._peft = self._tok = self._fe = None
+        gc.collect()
+
     def _attach_adapter(self, model: Any) -> tuple[Any, dict[str, Any]]:
         import json
 
