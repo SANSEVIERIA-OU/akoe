@@ -342,10 +342,30 @@ def default_whisper_model(tier: Tier) -> str:
     return "openai/whisper-small" if tier == Tier.EDGE else "openai/whisper-large-v3"
 
 
+def default_candidate_ctc_model(tier: Tier) -> str:
+    """CTC model for "did he say X or Y?" (issue #58, docs/catalogo_modelli.md):
+    omniASR CTC 1B v2 on EDGE, 3B v2 on WORKSTATION/CLOUD. The 3B is used only
+    once the SHA-256 of its checkpoint is pinned in `omniasr_ctc` (it was not
+    downloaded on the development machine); until then the 1B, whose hash is
+    pinned, is used on every tier, and the model name in the processing log
+    says which one ran."""
+    from akoe.transcribe.omniasr_ctc import (
+        DEFAULT_OMNIASR_MODEL,
+        WORKSTATION_OMNIASR_MODEL,
+        weights_pinned,
+    )
+
+    if tier != Tier.EDGE and weights_pinned(WORKSTATION_OMNIASR_MODEL):
+        return WORKSTATION_OMNIASR_MODEL
+    return DEFAULT_OMNIASR_MODEL
+
+
 class DefaultBackends:
-    """Real models (lazy, cached per process): ReDimNet-B2 voiceprint, Italian
-    CTC model for alignment and candidate scoring, Whisper generic / adapted,
-    Parakeet-TDT when NeMo is installed, LoRA trainer."""
+    """Real models (lazy, cached per process): ReDimNet2-B6 voiceprint (issue
+    #57); XLS-R 1B Italian for the character-level transcript alignment and
+    omniASR CTC v2 for candidate scoring, per tier (issue #58); Whisper
+    generic / adapted, Parakeet-TDT when NeMo is installed, LoRA trainer.
+    `ctc_model`, when given, replaces both CTC models (as before)."""
 
     def __init__(self, *, device: str = "cpu", voiceprint_name: str | None = None,
                  ctc_model: str | None = None, whisper_model: str | None = None,
@@ -370,12 +390,23 @@ class DefaultBackends:
         return self._get(("voiceprint", self.voiceprint_name),
                          lambda: default_voiceprint_backend(self.voiceprint_name, device=self.device))
 
-    def ctc_scorer(self) -> Any:
-        from akoe.transcribe.ctc_scorer import DEFAULT_CTC_MODEL, CTCForcedAlignmentScorer
+    def _ctc(self, model: str) -> Any:
+        from akoe.transcribe.ctc_scorer import CTCForcedAlignmentScorer
+        from akoe.transcribe.omniasr_ctc import OmniASRCTCScorer, is_omniasr_model
 
-        model = self.ctc_model or DEFAULT_CTC_MODEL
-        return self._get(("ctc", model), lambda: CTCForcedAlignmentScorer(
+        cls = OmniASRCTCScorer if is_omniasr_model(model) else CTCForcedAlignmentScorer
+        return self._get(("ctc", model), lambda: cls(
             model, device=self.device, local_files_only=self.local_files_only))
+
+    def ctc_scorer(self) -> Any:
+        """Character-level CTC scorer of the transcript aligner (XLS-R 1B Italian)."""
+        from akoe.transcribe.ctc_scorer import DEFAULT_CTC_MODEL
+
+        return self._ctc(self.ctc_model or DEFAULT_CTC_MODEL)
+
+    def candidate_ctc_scorer(self, tier: Tier) -> Any:
+        """CTC scorer for candidate phrases (omniASR CTC v2, see `default_candidate_ctc_model`)."""
+        return self._ctc(self.ctc_model or default_candidate_ctc_model(tier))
 
     def aligner(self) -> TranscriptAligner:
         from akoe.transcribe.ctc_aligner import CTCTranscriptAligner
@@ -431,7 +462,7 @@ class DefaultBackends:
         from akoe.transcribe.whisper_backend import WhisperDecoderScorer
 
         model = whisper_model or self.whisper_model or default_whisper_model(tier)
-        return [self.ctc_scorer(), WhisperDecoderScorer(self.whisper(model))]
+        return [self.candidate_ctc_scorer(tier), WhisperDecoderScorer(self.whisper(model))]
 
     def trainer(self) -> Callable[..., Any]:
         from akoe.adapt.train import train_adapter
