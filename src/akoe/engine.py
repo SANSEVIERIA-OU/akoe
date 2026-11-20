@@ -779,12 +779,20 @@ def build_subject_model(
     compute_timbre: bool = True,
     calibrate: bool = True,
     other_speaker_files: Sequence[Path] = (),
+    score_recipe: Any = "default",
+    cohort_files: Sequence[Path] = (),
     mode: Mode = Mode.FORENSIC,
     tier: Tier = Tier.EDGE,
     provider: BackendProvider | None = None,
     progress: ProgressFn | None = None,
 ) -> WorkflowResult:
     """Import the subject's recordings (reference role) and build his model.
+
+    Voiceprint scores are normalized with the WeSpeaker recipe before the
+    calibration (`speaker/score_norm.py`, issue #57): `score_recipe` is a
+    `ScoringRecipe` ("default" = `DEFAULT_SCORING_RECIPE`, None = plain cosine
+    as before); `cohort_files` are cohort-only clips of non-subject speakers
+    (e.g. a public Italian cohort), added to the other speakers of the case.
 
     Untimed transcriptions are aligned with the CTC aligner (spans below its
     threshold are flagged), recordings are split train/holdout by recording,
@@ -810,7 +818,17 @@ def build_subject_model(
         "review": review.reviewer if review is not None else None, "certify_all_by": certify_all_by,
         "compute_timbre": compute_timbre, "calibrate": calibrate,
         "other_speaker_files": [str(p) for p in other_speaker_files],
+        "cohort_files": [str(p) for p in cohort_files],
     }
+    from akoe.speaker.score_norm import DEFAULT_SCORING_RECIPE, ScoringRecipe
+
+    if isinstance(score_recipe, str):
+        if score_recipe != "default":
+            raise EngineError(f"Ricetta di punteggio sconosciuta: {score_recipe!r}")
+        score_recipe = DEFAULT_SCORING_RECIPE
+    elif score_recipe is not None and not isinstance(score_recipe, ScoringRecipe):
+        score_recipe = ScoringRecipe.model_validate(score_recipe)
+    params["score_recipe"] = score_recipe.model_dump(mode="json") if score_recipe is not None else None
     wl = WorkflowLog(case, "build_subject_model", mode=mode, tier=tier, parameters=params)
     ds = SubjectDataset.load_or_create(case, subject_id)
 
@@ -931,17 +949,31 @@ def build_subject_model(
             ref = _store_input(case, Path(p), "working/other_speakers", "other_speaker")
             wl.input(f"other_speaker:{ref.sha256[:12]}", ref)
             extra.append((load_audio(ref.resolve(case.root), TARGET_SR), TARGET_SR))
-        loro = sp.loro_calibration_scores(case, ds, vp, extra_other=extra)
+        cohort = []
+        for p in cohort_files:
+            ref = _store_input(case, Path(p), "working/score_cohort", "score_cohort")
+            wl.input(f"score_cohort:{ref.sha256[:12]}", ref)
+            cohort.append((load_audio(ref.resolve(case.root), TARGET_SR), TARGET_SR, f"sha256:{ref.sha256}"))
+        loro = sp.loro_calibration_scores(case, ds, vp, extra_other=extra, recipe=score_recipe,
+                                          cohort_audio=cohort)
         for w in loro.warnings:
             wl.note(w)
         if len(loro.same) >= 2 and len(loro.other) >= 2:
+            norm_ref = None
+            if loro.normalization is not None:
+                from akoe.speaker.profile import save_normalization
+
+                norm_ref = save_normalization(case, loro.normalization)
+                wl.register(norm_ref, "score_normalization")
             cal = sp.calibrate_scores(loro.same, loro.other, backend=vp.name, profile=upd.profile,
-                                      material=loro.material_json(), scheme=sp.LORO_SCHEME, holdout_used=False)
+                                      material=loro.material_json(), scheme=sp.LORO_SCHEME, holdout_used=False,
+                                      normalization=norm_ref, score_kind=loro.score_kind)
             cal_ref = sp.save_calibration(case, cal)
             wl.register(cal_ref, "calibration")
             cal_info = {"performed": True, "scheme": cal.scheme, "holdout_used": cal.holdout_used,
-                        "eer": cal.eer, "threshold_score": cal.threshold_score, "reliable": cal.reliable,
-                        "n_same": cal.n_same, "n_other": cal.n_other, "warnings": cal.warnings}
+                        "score_kind": cal.score_kind, "eer": cal.eer, "threshold_score": cal.threshold_score,
+                        "reliable": cal.reliable, "n_same": cal.n_same, "n_other": cal.n_other,
+                        "warnings": cal.warnings}
             wl.stage("score_calibration", StageKind.DETERMINISTIC, {**cal_info, "material": loro.material,
                                                                     "params": cal.params}, started)
             for w in cal.warnings:
@@ -1599,6 +1631,8 @@ def _speaker_scores(case: Case, subject_id: str, segments: list[SegmentHypothese
     if state.calibration is not None:
         wl.input("score_calibration", state.calibration)
         cal = load_calibration(case, state.calibration)
+        if cal.normalization is not None:
+            wl.input("score_normalization", cal.normalization)
     try:
         scorer = ProfileScorer.load(case, load_profile(case, state.profile), vp, cal)
     except (DatasetError, ValueError) as e:
@@ -1618,6 +1652,7 @@ def _speaker_scores(case: Case, subject_id: str, segments: list[SegmentHypothese
     wl.stage("speaker_scores", StageKind.DETERMINISTIC, {
         "subject_id": subject_id, "profile_version": state.profile_version, "backend": vp.name,
         "calibrated": cal is not None, "calibration_scheme": cal.scheme if cal else None,
+        "score_kind": cal.score_kind if cal else "cosine",
         "n_scored": scored, "n_possible_other_speaker": flagged,
         "note": "Punteggio di somiglianza, mai un'identificazione.",
     }, started, provenance=getattr(vp, "provenance", None))

@@ -203,7 +203,7 @@ def subject_model(
     seed: int = typer.Option(0, "--seed"),
     no_align: bool = typer.Option(False, "--no-align", help="Non allineare le trascrizioni senza tempi."),
     certify_by: str | None = typer.Option(None, "--certify-by", help="L'operatore indicato accetta le trascrizioni esistenti come certe (esclusi i segmenti dubbi)."),
-    voiceprint: str | None = typer.Option(None, "--voiceprint", help="Modello dell'impronta: redimnet-b2 (predefinito), redimnet-b6, ecapa."),
+    voiceprint: str | None = typer.Option(None, "--voiceprint", help="Modello dell'impronta: redimnet2-b6 (predefinito), redimnet2-b6-vox2, w2v-bert-sv, redimnet-b2, redimnet-b6, ecapa."),
     no_timbre: bool = typer.Option(False, "--no-timbre", help="Non calcolare il profilo timbrico."),
     no_calibration: bool = typer.Option(False, "--no-calibration"),
     other_speaker: list[Path] = typer.Option([], "--other-speaker", help="Clip di altri parlanti per la calibrazione (ripetibile)."),
