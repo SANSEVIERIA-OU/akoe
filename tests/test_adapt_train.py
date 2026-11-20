@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Fast training tests with a tiny randomly initialised Whisper (no downloads)."""
 import json
 import logging
@@ -8,7 +9,7 @@ import pytest
 torch = pytest.importorskip("torch")
 pytest.importorskip("peft")
 
-from forensicaudio.adapt.artifact import (  # noqa: E402
+from akoe.adapt.artifact import (  # noqa: E402
     ADAPTER_JSON,
     CHECKSUMS,
     AdapterIntegrityError,
@@ -18,10 +19,10 @@ from forensicaudio.adapt.artifact import (  # noqa: E402
     load_adapter_model,
     verify_adapter,
 )
-from forensicaudio.adapt.dataset import TrainingSetConfig, build_training_set  # noqa: E402
-from forensicaudio.adapt.train import TrainConfig, TrainError, train_adapter  # noqa: E402
-from forensicaudio.config import Channel, Tier  # noqa: E402
-from forensicaudio.models import (  # noqa: E402
+from akoe.adapt.dataset import TrainingSetConfig, build_training_set  # noqa: E402
+from akoe.adapt.train import TrainConfig, TrainError, train_adapter  # noqa: E402
+from akoe.config import Channel, Tier  # noqa: E402
+from akoe.models import (  # noqa: E402
     AdapterTechnique,
     ArtifactRef,
     DatasetItem,

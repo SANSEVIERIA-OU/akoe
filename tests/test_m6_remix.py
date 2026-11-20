@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Cleaned/original remix and choice of the transcriber input (issue #34)."""
 import json
 import math
@@ -7,8 +8,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from forensicaudio.config import StageKind
-from forensicaudio.stages import remix
+from akoe.config import StageKind
+from akoe.stages import remix
 from tests import m6_synth as s
 
 SR = s.SR

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Deterministic fake backends for tests (no models, no downloads)."""
 from __future__ import annotations
 
@@ -8,8 +9,8 @@ from pathlib import Path
 
 import numpy as np
 
-from forensicaudio.config import StageKind
-from forensicaudio.models import Alternative, SegmentHypotheses, WordHypothesis
+from akoe.config import StageKind
+from akoe.models import Alternative, SegmentHypotheses, WordHypothesis
 
 
 class FakeVoiceprint:
@@ -84,7 +85,7 @@ class FakeLexiconDecoder:
     the first confirmed term replaces the last word of the plain text."""
 
     def __init__(self, text: str, terms) -> None:
-        from forensicaudio.adapt.lexicon import _resolve_terms
+        from akoe.adapt.lexicon import _resolve_terms
 
         self.text = text
         self.terms, self.lexicon_sha256 = _resolve_terms(terms)
@@ -96,7 +97,7 @@ class FakeLexiconDecoder:
         return " ".join(words[:-1] + [self.terms[0]])
 
     def decode_both(self, audio, sr):
-        from forensicaudio.adapt.lexicon import dual_decode
+        from akoe.adapt.lexicon import dual_decode
 
         return dual_decode(lambda use: self.decode(audio, sr, use_lexicon=use), self.terms)
 
@@ -112,7 +113,7 @@ class FakeLexiconASR(FakeASR):
 def uniform_ctc_scorer(name: str = "fake-ctc"):
     """CTC scorer over uniform emissions (one frame per 320 samples): every
     path is equally likely, so any text aligns with score 0."""
-    from forensicaudio.transcribe.ctc_scorer import CTCForcedAlignmentScorer
+    from akoe.transcribe.ctc_scorer import CTCForcedAlignmentScorer
 
     letters = "abcdefghijklmnopqrstuvwxyzàèéìòù'"
     vocab = {"<pad>": 0, "|": 1, **{c: i + 2 for i, c in enumerate(letters)}}
@@ -128,7 +129,7 @@ def fake_trainer(training_set, out_dir, config, *, adapter_id, root=None, tier=N
     """Writes an adapter folder with the real artifact layout (weights +
     SHA256SUMS, train manifest, adapter.json, training record) without
     training anything."""
-    from forensicaudio.adapt.artifact import (
+    from akoe.adapt.artifact import (
         ADAPTER_JSON,
         TRAIN_MANIFEST,
         TRAINING_RECORD,
@@ -136,8 +137,8 @@ def fake_trainer(training_set, out_dir, config, *, adapter_id, root=None, tier=N
         save_adapter_artifact,
         weights_ref,
     )
-    from forensicaudio.adapt.train import TrainingRecord, TrainResult
-    from forensicaudio.models import AdapterArtifact, ArtifactRef
+    from akoe.adapt.train import TrainingRecord, TrainResult
+    from akoe.models import AdapterArtifact, ArtifactRef
 
     out_dir = Path(out_dir)
     wdir = out_dir / WEIGHTS_DIR
@@ -181,7 +182,7 @@ class FakeProvider:
         return FakeVoiceprint()
 
     def aligner(self):
-        from forensicaudio.transcribe.ctc_aligner import CTCTranscriptAligner
+        from akoe.transcribe.ctc_aligner import CTCTranscriptAligner
 
         self.calls.append("aligner")
         return CTCTranscriptAligner(uniform_ctc_scorer())

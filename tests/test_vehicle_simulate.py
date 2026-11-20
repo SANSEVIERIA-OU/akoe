@@ -1,17 +1,18 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 import logging
 
 import numpy as np
 import pytest
 
-from forensicaudio.case import Case
-from forensicaudio.config import RecordingSource
-from forensicaudio.models import ArtifactRef, DatasetItem
-from forensicaudio.utils import sha256_file
-from forensicaudio.vehicle.audio import estimate_lag, write_audio
-from forensicaudio.vehicle.codecs import available_codecs
-from forensicaudio.vehicle.profile import NoiseSource, build_vehicle_profile, estimate_noise
-from forensicaudio.vehicle.simulate import (
+from akoe.case import Case
+from akoe.config import RecordingSource
+from akoe.models import ArtifactRef, DatasetItem
+from akoe.utils import sha256_file
+from akoe.vehicle.audio import estimate_lag, write_audio
+from akoe.vehicle.codecs import available_codecs
+from akoe.vehicle.profile import NoiseSource, build_vehicle_profile, estimate_noise
+from akoe.vehicle.simulate import (
     MANIFEST_FILE,
     ChannelSimConfig,
     ChannelSimulator,
@@ -192,7 +193,7 @@ def test_write_simulated_sidecar(tmp_path, sim, speech):
 
 def test_end_to_end_from_estimated_profile(tmp_path):
     """M3 done-when: VehicleProfile + clean segments -> reproducible simulated set (seed, hashes)."""
-    from forensicaudio.vehicle.profile import estimate_vehicle_profile
+    from akoe.vehicle.profile import estimate_vehicle_profile
 
     case = Case.create(tmp_path / "case", "c1")
     rec = tmp_path / "intercettazione.wav"

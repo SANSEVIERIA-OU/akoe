@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Engine harmonics: tracking and attenuation (issue #31)."""
 from pathlib import Path
 
@@ -5,7 +6,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from forensicaudio.stages import harmonics
+from akoe.stages import harmonics
 from tests import m6_synth as s
 
 SR = s.SR

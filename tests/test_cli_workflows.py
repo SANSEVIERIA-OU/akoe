@@ -1,11 +1,12 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """CLI commands mirroring the engine workflows (fake backends)."""
 import json
 
 import pytest
 from typer.testing import CliRunner
 
-from forensicaudio import engine
-from forensicaudio.cli import app
+from akoe import engine
+from akoe.cli import app
 from tests.engine_synth import make_evidence, make_subject_folder
 from tests.fakes import FakeProvider
 

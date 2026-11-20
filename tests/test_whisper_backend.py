@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 
 import numpy as np
@@ -6,9 +7,9 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("transformers")
 
-from forensicaudio.config import StageKind
-from forensicaudio.interfaces import ASRBackend, CandidateScorer
-from forensicaudio.transcribe.whisper_backend import (
+from akoe.config import StageKind
+from akoe.interfaces import ASRBackend, CandidateScorer
+from akoe.transcribe.whisper_backend import (
     KNOWN_REVISIONS,
     SamplingConfig,
     WhisperDecoderScorer,

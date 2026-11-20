@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Synthetic signals for the M6 cleaning tests: speech-like voice, engine
 harmonics, coloured car noise, cabin impulse responses, music-like reference.
 
@@ -136,8 +137,8 @@ def assert_loggable(params: dict, name: str = "stage") -> None:
     import json
     from datetime import datetime, timezone
 
-    from forensicaudio.config import Mode, StageKind
-    from forensicaudio.models import StageLog
+    from akoe.config import Mode, StageKind
+    from akoe.models import StageLog
 
     json.dumps(params, allow_nan=True)
     now = datetime.now(timezone.utc)

@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Score calibration without the self-assessment holdout (issue #49)."""
 import json
 
 import numpy as np
 
-from forensicaudio.models import DatasetSplit
-from forensicaudio.speaker.profile import (
+from akoe.models import DatasetSplit
+from akoe.speaker.profile import (
     LORO_SCHEME,
     ProfileBuildConfig,
     build_speaker_profile,
@@ -53,7 +54,7 @@ def test_loro_scores_are_not_the_fixed_centroid_scores(material):  # noqa: F811
     loro = loro_calibration_scores(case, ds, vp)
     train_items = ds.select_items(splits=(DatasetSplit.TRAIN,), verified_only=True)
     # scoring training items against centroids that include them would be optimistic
-    from forensicaudio.speaker._io import cut, load_audio
+    from akoe.speaker._io import cut, load_audio
 
     fixed_scores = []
     for it in train_items:

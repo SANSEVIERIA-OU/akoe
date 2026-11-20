@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Generate synthetic test audio for end-to-end pipeline validation.
 
 Produces a fake "evidence" file (sinusoid + noise + silent gaps for VAD)

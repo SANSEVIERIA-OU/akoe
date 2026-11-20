@@ -1,13 +1,14 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import os
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from forensicaudio.config import StageKind
-from forensicaudio.interfaces import ASRBackend
-from forensicaudio.neural import BackendUnavailable, ModelProvenance
-from forensicaudio.transcribe.parakeet_backend import (
+from akoe.config import StageKind
+from akoe.interfaces import ASRBackend
+from akoe.neural import BackendUnavailable, ModelProvenance
+from akoe.transcribe.parakeet_backend import (
     KNOWN_REVISIONS,
     ParakeetTDTBackend,
     nemo_available,
@@ -76,7 +77,7 @@ def test_unpairable_confidence_is_dropped_not_misassigned():
 def test_real_nemo_model():
     from tests.real_audio import italian_example
 
-    model_id = os.environ.get("WHISPER_TEST_NEMO_MODEL", "nvidia/parakeet-tdt-0.6b-v3")
+    model_id = os.environ.get("AKOE_TEST_NEMO_MODEL", "nvidia/parakeet-tdt-0.6b-v3")
     audio, sr, _ = italian_example()
     be = ParakeetTDTBackend(model_id)
     segs = be.transcribe(audio, sr, n_best=3)

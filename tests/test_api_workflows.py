@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Engine workflows through the API (jobs, transcript, self-assessment,
 labelled listening audio, synchronous candidate scoring), with fakes."""
 import time
@@ -6,7 +7,7 @@ from urllib.parse import unquote
 import pytest
 from fastapi.testclient import TestClient
 
-from forensicaudio.api.server import create_app
+from akoe.api.server import create_app
 from tests.engine_synth import make_evidence, make_subject_folder
 from tests.fakes import FakeProvider
 

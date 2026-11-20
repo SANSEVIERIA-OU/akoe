@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 
 import librosa
@@ -5,11 +6,11 @@ import numpy as np
 import pytest
 import scipy.signal as ss
 
-from forensicaudio.case import Case
-from forensicaudio.config import Channel, RecordingSource, StageKind
-from forensicaudio.models import DatasetSplit, RecordingCondition, SegmentFlag, SegmentHypotheses, SpeakerProfile
-from forensicaudio.speaker.dataset import DatasetError, SubjectDataset
-from forensicaudio.speaker.profile import (
+from akoe.case import Case
+from akoe.config import Channel, RecordingSource, StageKind
+from akoe.models import DatasetSplit, RecordingCondition, SegmentFlag, SegmentHypotheses, SpeakerProfile
+from akoe.speaker.dataset import DatasetError, SubjectDataset
+from akoe.speaker.profile import (
     ProfileBuildConfig,
     ProfileScorer,
     ScoreCalibration,
@@ -102,7 +103,7 @@ def test_build_profile_one_condition_per_key(material):
         data = json.loads(cp.voiceprint.resolve(case.root).read_text())
         assert data["backend"] == "fake-voiceprint" and not set(data["item_ids"]) & holdout_items
         assert cp.n_segments == data["n_embeddings"] and cp.seconds == pytest.approx(cp.n_segments * 1.0)
-        assert cp.timbre["method"] == "forensicaudio.speaker.timbre/v1"
+        assert cp.timbre["method"] == "akoe.speaker.timbre/v1"
     car = next(cp for cp in prof.conditions if cp.condition.channel == Channel.CAR)
     assert car.timbre["f0"]["hz"]["median"] == pytest.approx(SPEAKER_A["f0"], rel=0.05)
     phone = next(cp for cp in prof.conditions if cp.condition.channel == Channel.PHONE)

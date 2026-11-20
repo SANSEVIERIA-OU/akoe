@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Tiny, randomly initialized models built on the fly for fast tests (no downloads).
 
 They exercise the real loading/decoding code of the backends; their outputs are

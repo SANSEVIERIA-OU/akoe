@@ -1,7 +1,8 @@
-from forensicaudio.config import StageKind
-from forensicaudio.models import Alternative, SegmentFlag, SegmentHypotheses, WordHypothesis
-from forensicaudio.transcribe.combine import HypothesisSource, combine_hypotheses
-from forensicaudio.transcribe.guard import (
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
+from akoe.config import StageKind
+from akoe.models import Alternative, SegmentFlag, SegmentHypotheses, WordHypothesis
+from akoe.transcribe.combine import HypothesisSource, combine_hypotheses
+from akoe.transcribe.guard import (
     GuardConfig,
     GuardReason,
     compression_ratio,

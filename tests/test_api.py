@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import time
 
 import numpy as np
 import soundfile as sf
 from fastapi.testclient import TestClient
 
-from forensicaudio.api.server import create_app
+from akoe.api.server import create_app
 
 
 def _client(tmp_path):

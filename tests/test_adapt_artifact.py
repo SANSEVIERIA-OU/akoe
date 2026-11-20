@@ -1,9 +1,10 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import hashlib
 import json
 
 import pytest
 
-from forensicaudio.adapt.artifact import (
+from akoe.adapt.artifact import (
     CHECKSUMS,
     AdapterIntegrityError,
     hash_base_weights,
@@ -15,8 +16,8 @@ from forensicaudio.adapt.artifact import (
     weights_dir_of,
     weights_ref,
 )
-from forensicaudio.models import AdapterArtifact, AdapterTechnique
-from forensicaudio.utils import sha256_file
+from akoe.models import AdapterArtifact, AdapterTechnique
+from akoe.utils import sha256_file
 
 
 @pytest.fixture

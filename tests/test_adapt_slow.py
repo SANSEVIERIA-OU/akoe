@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """CPU smoke tests with the real openai/whisper-tiny (download ~150 MB).
 
 Run with: .venv/bin/python -m pytest -m slow tests/test_adapt_slow.py -s
@@ -14,17 +15,17 @@ pytestmark = pytest.mark.slow
 torch = pytest.importorskip("torch")
 pytest.importorskip("peft")
 
-from forensicaudio.adapt.artifact import load_adapter, verify_adapter  # noqa: E402
-from forensicaudio.adapt.dataset import TrainingSetConfig, build_training_set  # noqa: E402
-from forensicaudio.adapt.lexicon import (  # noqa: E402
+from akoe.adapt.artifact import load_adapter, verify_adapter  # noqa: E402
+from akoe.adapt.dataset import TrainingSetConfig, build_training_set  # noqa: E402
+from akoe.adapt.lexicon import (  # noqa: E402
     BiasConfig,
     CaseLexicon,
     WhisperLexiconDecoder,
     measure_insertion_rate,
 )
-from forensicaudio.adapt.train import TrainConfig, train_adapter  # noqa: E402
-from forensicaudio.config import Channel, Tier  # noqa: E402
-from forensicaudio.models import ArtifactRef, DatasetItem, DatasetSplit, RecordingCondition  # noqa: E402
+from akoe.adapt.train import TrainConfig, train_adapter  # noqa: E402
+from akoe.config import Channel, Tier  # noqa: E402
+from akoe.models import ArtifactRef, DatasetItem, DatasetSplit, RecordingCondition  # noqa: E402
 
 BASE = "openai/whisper-tiny"
 SR = 16000

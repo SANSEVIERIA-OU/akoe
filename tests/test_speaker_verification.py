@@ -1,13 +1,14 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 
 import pytest
 
-from forensicaudio.case import Case
-from forensicaudio.config import Channel, RecordingSource
-from forensicaudio.models import DatasetSplit, RecordingCondition
-from forensicaudio.speaker.dataset import DatasetError, SubjectDataset
-from forensicaudio.speaker.profile import ProfileBuildConfig, load_profile
-from forensicaudio.speaker.verification import (
+from akoe.case import Case
+from akoe.config import Channel, RecordingSource
+from akoe.models import DatasetSplit, RecordingCondition
+from akoe.speaker.dataset import DatasetError, SubjectDataset
+from akoe.speaker.profile import ProfileBuildConfig, load_profile
+from akoe.speaker.verification import (
     ItemReview,
     Review,
     ReviewDecision,

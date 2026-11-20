@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Small public speech clips for the slow tests (downloaded from the HF hub at
 pinned revisions; never committed). Only used by tests marked `slow`."""
 from __future__ import annotations

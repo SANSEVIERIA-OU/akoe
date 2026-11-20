@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import os
 
 import pytest
 
-from forensicaudio.case import CASE_SUBDIRS, Case, CaseError
-from forensicaudio.config import Channel, RecordingSource
-from forensicaudio.models import RecordingCondition
+from akoe.case import CASE_SUBDIRS, Case, CaseError
+from akoe.config import Channel, RecordingSource
+from akoe.models import RecordingCondition
 
 
 def _rec(path, data: bytes):
@@ -58,7 +59,7 @@ def test_pairs_prefer_local_recording(tmp_path):
 
 
 def test_reference_role(tmp_path):
-    from forensicaudio.models import EvidenceRole
+    from akoe.models import EvidenceRole
 
     case = Case.create(tmp_path / "c", "c")
     ref = case.import_evidence(_rec(tmp_path / "phone.wav", b"subject on the phone"), role=EvidenceRole.REFERENCE)

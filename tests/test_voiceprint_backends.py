@@ -1,8 +1,9 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import numpy as np
 import pytest
 
-from forensicaudio.interfaces import VoiceprintBackend
-from forensicaudio.speaker.voiceprint_backends import (
+from akoe.interfaces import VoiceprintBackend
+from akoe.speaker.voiceprint_backends import (
     ECAPA_REVISION,
     REDIMNET_KNOWN_SHA256,
     EcapaVoiceprint,

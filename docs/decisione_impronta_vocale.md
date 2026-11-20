@@ -2,7 +2,7 @@
 
 **Data:** 2026-11-20. **Stato:** proposta, da confermare con l'autovalutazione per condizione (M5).
 
-L'impronta vocale in WHISPER produce un **punteggio**, mai un'identificazione. Serve a smistare, selezionare e avvisare ("possibile altro parlante"). Non serve per la sintesi della voce (`MASTER_PLAN.md` §3.7).
+L'impronta vocale in Akoe produce un **punteggio**, mai un'identificazione. Serve a smistare, selezionare e avvisare ("possibile altro parlante"). Non serve per la sintesi della voce (`MASTER_PLAN.md` §3.7).
 
 ## Requisiti
 

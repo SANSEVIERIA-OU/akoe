@@ -1,8 +1,9 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import pytest
 from pydantic import ValidationError
 
-from forensicaudio.config import Channel, RecordingSource, StageKind, VocalEffort
-from forensicaudio.models import (
+from akoe.config import Channel, RecordingSource, StageKind, VocalEffort
+from akoe.models import (
     AdapterArtifact,
     AdapterTechnique,
     Alternative,

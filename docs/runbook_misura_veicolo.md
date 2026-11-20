@@ -7,7 +7,7 @@ Procedura operativa per costruire il **profilo misurato del veicolo** (`MASTER_P
 
 Le misure servono a simulare il canale per l'adattamento del trascrittore e per l'autovalutazione, e a stimare il rapporto segnale/rumore. Non modificano in alcun modo i reperti.
 
-Strumenti software: `python -m forensicaudio.vehicle.measure` (generazione dello sweep e deconvoluzione) e `forensicaudio.vehicle.profile` (import nel caso).
+Strumenti software: `python -m akoe.vehicle.measure` (generazione dello sweep e deconvoluzione) e `akoe.vehicle.profile` (import nel caso).
 
 ---
 
@@ -54,7 +54,7 @@ Strumenti software: `python -m forensicaudio.vehicle.measure` (generazione dello
 Generare lo sweep esponenziale (metodo di Farina) sul computer di lavoro:
 
 ```bash
-python -m forensicaudio.vehicle.measure genera --out sweep/
+python -m akoe.vehicle.measure genera --out sweep/
 ```
 
 Valori predefiniti:
@@ -126,7 +126,7 @@ Se la microspia applica un controllo automatico del guadagno (AGC) o una riduzio
 Se possibile si fa sul posto, così una misura difettosa si ripete subito.
 
 ```bash
-python -m forensicaudio.vehicle.measure deconvolvi V01_20261120_sweep_guidatore_locale_01.wav \
+python -m akoe.vehicle.measure deconvolvi V01_20261120_sweep_guidatore_locale_01.wav \
     --parametri sweep/sweep_params.json \
     --out V01_20261120_ir_guidatore_locale_01.wav
 ```
@@ -280,8 +280,8 @@ I file grezzi mantengono il formato prodotto dal dispositivo. Non si convertono:
 5. **Import nel caso.** Copia i file in `profiles/vehicle-<id>/` del caso, in sola lettura, verificando l'hash della copia, e salva `vehicle_profile.json`:
    ```python
    from pathlib import Path
-   from forensicaudio.case import Case
-   from forensicaudio.vehicle.profile import build_profile_from_manifest
+   from akoe.case import Case
+   from akoe.vehicle.profile import build_profile_from_manifest
 
    case = Case.open(Path("cases/<id-caso>"))
    profile = build_profile_from_manifest(Path("misura/misura.json"), case=case)

@@ -1,12 +1,13 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 
 import numpy as np
 import pytest
 from scipy.signal import butter, fftconvolve, sosfiltfilt
 
-from forensicaudio.utils import sha256_file
-from forensicaudio.vehicle.audio import load_audio, resample, write_audio
-from forensicaudio.vehicle.measure import (
+from akoe.utils import sha256_file
+from akoe.vehicle.audio import load_audio, resample, write_audio
+from akoe.vehicle.measure import (
     PARAMS_FILE,
     SweepParams,
     deconvolve,

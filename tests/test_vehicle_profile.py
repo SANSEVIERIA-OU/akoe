@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 import os
 
@@ -5,12 +6,12 @@ import numpy as np
 import pytest
 from scipy.signal import welch
 
-from forensicaudio.case import Case
-from forensicaudio.config import Channel, RecordingSource
-from forensicaudio.models import RecordingCondition, VehicleProfile
-from forensicaudio.utils import sha256_file
-from forensicaudio.vehicle.audio import write_audio
-from forensicaudio.vehicle.profile import (
+from akoe.case import Case
+from akoe.config import Channel, RecordingSource
+from akoe.models import RecordingCondition, VehicleProfile
+from akoe.utils import sha256_file
+from akoe.vehicle.audio import write_audio
+from akoe.vehicle.profile import (
     PROFILE_FILE,
     ImpulseResponseSource,
     NoiseEstimateParams,

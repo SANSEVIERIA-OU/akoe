@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 
 import numpy as np
 import pytest
 
-from forensicaudio.transcribe.candidates import ComparisonOutcome, ScorerOutcome, compare_candidates
-from forensicaudio.transcribe.ctc_scorer import CTCForcedAlignmentScorer
+from akoe.transcribe.candidates import ComparisonOutcome, ScorerOutcome, compare_candidates
+from akoe.transcribe.ctc_scorer import CTCForcedAlignmentScorer
 from tests.fakes import FakeScorer
 from tests.test_ctc_scorer import VOCAB, synthetic_emitter
 
@@ -84,11 +85,11 @@ def test_ctc_details_are_kept_and_json_serializable():
 def test_real_ctc_and_whisper_reported_separately():
     import os
 
-    from forensicaudio.transcribe.whisper_backend import WhisperDecoderScorer, WhisperHFBackend
+    from akoe.transcribe.whisper_backend import WhisperDecoderScorer, WhisperHFBackend
     from tests.real_audio import italian_example
 
     audio, sr, text = italian_example()
-    ctc = CTCForcedAlignmentScorer(os.environ.get("WHISPER_TEST_CTC_MODEL",
+    ctc = CTCForcedAlignmentScorer(os.environ.get("AKOE_TEST_CTC_MODEL",
                                                   "facebook/wav2vec2-base-10k-voxpopuli-ft-it"))
     wh = WhisperDecoderScorer(WhisperHFBackend("openai/whisper-tiny"))
     cands = [text, "Oggi piove molto forte in montagna"]

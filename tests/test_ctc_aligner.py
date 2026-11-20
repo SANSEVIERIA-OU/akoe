@@ -1,13 +1,14 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """CTC aligner for untimed transcriptions (issue #7), on crafted emissions."""
 import numpy as np
 import pytest
 
-from forensicaudio.case import Case
-from forensicaudio.config import Channel, RecordingSource
-from forensicaudio.models import RecordingCondition
-from forensicaudio.speaker.dataset import SubjectDataset, TranscriptAligner
-from forensicaudio.transcribe.ctc_aligner import CTCTranscriptAligner
-from forensicaudio.transcribe.ctc_scorer import CTCForcedAlignmentScorer
+from akoe.case import Case
+from akoe.config import Channel, RecordingSource
+from akoe.models import RecordingCondition
+from akoe.speaker.dataset import SubjectDataset, TranscriptAligner
+from akoe.transcribe.ctc_aligner import CTCTranscriptAligner
+from akoe.transcribe.ctc_scorer import CTCForcedAlignmentScorer
 from tests.fakes import uniform_ctc_scorer
 from tests.synth_voice import write_wav
 

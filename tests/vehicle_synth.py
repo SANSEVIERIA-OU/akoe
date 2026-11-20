@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Synthetic signals for the vehicle tests (no real audio, no downloads)."""
 from __future__ import annotations
 

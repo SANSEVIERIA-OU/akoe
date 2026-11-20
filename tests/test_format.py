@@ -1,11 +1,12 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 import logging
 
 import numpy as np
 import pytest
 
-from forensicaudio.config import StageKind
-from forensicaudio.models import (
+from akoe.config import StageKind
+from akoe.models import (
     Alternative,
     ConfidenceBand,
     HypothesisTranscript,
@@ -13,8 +14,8 @@ from forensicaudio.models import (
     SegmentHypotheses,
     WordHypothesis,
 )
-from forensicaudio.transcribe.combine import HypothesisSource, combine_hypotheses
-from forensicaudio.transcribe.format import (
+from akoe.transcribe.combine import HypothesisSource, combine_hypotheses
+from akoe.transcribe.format import (
     TRANSCRIPT_KIND,
     FormatConfig,
     build_transcript,
@@ -24,8 +25,8 @@ from forensicaudio.transcribe.format import (
     transcript_models,
     write_transcript,
 )
-from forensicaudio.transcribe.guard import guard_segments
-from forensicaudio.utils import sha256_file
+from akoe.transcribe.guard import guard_segments
+from akoe.utils import sha256_file
 from tests.fakes import FakeASR
 
 

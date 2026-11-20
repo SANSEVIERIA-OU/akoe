@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Tiny randomly initialised Whisper for fast tests (no downloads).
 
 The tokenizer is a byte-level BPE with the Whisper special tokens in the

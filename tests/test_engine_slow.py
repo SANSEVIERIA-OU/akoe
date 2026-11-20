@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """End-to-end case on real Italian speech with real models (slow, offline).
 
 Assets (never committed; the test is skipped when they are missing):
@@ -27,7 +28,7 @@ import pytest
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 pytestmark = pytest.mark.slow
 
-MINDS = Path(os.environ.get("WHISPER_TEST_MINDS_DIR", "/tmp/whisper_test_audio"))
+MINDS = Path(os.environ.get("AKOE_TEST_MINDS_DIR", "/tmp/whisper_test_audio"))
 CTC = "facebook/wav2vec2-base-10k-voxpopuli-ft-it"
 IT_TEXT = "Buongiorno a tutti e benvenuti a bordo"
 
@@ -70,13 +71,13 @@ def test_real_italian_case_end_to_end(tmp_path):
         pytest.skip("clip MInDS-14 it-IT non presenti")
     import soundfile as sf
 
-    from forensicaudio import engine
-    from forensicaudio.adapt.train import TrainConfig
-    from forensicaudio.case import Case
-    from forensicaudio.config import Channel, RecordingSource, StageKind
-    from forensicaudio.models import HypothesisTranscript, ProcessingLog, RecordingCondition, SelfAssessment
-    from forensicaudio.speaker.voiceprint_backends import EcapaVoiceprint
-    from forensicaudio.vehicle.audio import resample
+    from akoe import engine
+    from akoe.adapt.train import TrainConfig
+    from akoe.case import Case
+    from akoe.config import Channel, RecordingSource, StageKind
+    from akoe.models import HypothesisTranscript, ProcessingLog, RecordingCondition, SelfAssessment
+    from akoe.speaker.voiceprint_backends import EcapaVoiceprint
+    from akoe.vehicle.audio import resample
     from tests import m6_synth
 
     try:
@@ -133,7 +134,7 @@ def test_real_italian_case_end_to_end(tmp_path):
                                  lora_alpha=32, num_threads=2))
     out["assess"] = engine.self_assess(case, "s1", vehicle_id="auto1", adapter="latest", voiceprint=vp,
                                        codecs=["g711_ulaw"], provider=backends,
-                                       config=__import__("forensicaudio.assess.selfcheck", fromlist=["x"])
+                                       config=__import__("akoe.assess.selfcheck", fromlist=["x"])
                                        .SelfCheckConfig(n_best=3, n_bootstrap=200))
     out["transcribe_adapted"] = engine.transcribe(case, ev.evidence_id, adapter="latest", subject_id="s1",
                                                   voiceprint=vp, provider=backends, n_best=3)

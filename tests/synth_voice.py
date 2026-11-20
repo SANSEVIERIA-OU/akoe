@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Synthetic voice-like signals for speaker tests (no real speech, no downloads).
 
 A "voice" is a glottal impulse train with slow F0 modulation, filtered by a

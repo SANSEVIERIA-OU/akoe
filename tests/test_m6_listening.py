@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Speaker-informed listening version with supervised NMF (issue #33)."""
 from pathlib import Path
 
@@ -5,8 +6,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from forensicaudio.config import StageKind
-from forensicaudio.stages import listening
+from akoe.config import StageKind
+from akoe.stages import listening
 from tests import m6_synth as s
 
 SR = s.SR

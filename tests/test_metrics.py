@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import jiwer
 import numpy as np
 import pytest
 from sklearn.metrics import roc_auc_score, roc_curve
 
-from forensicaudio.assess import metrics as m
-from forensicaudio.assess.metrics import (
+from akoe.assess import metrics as m
+from akoe.assess.metrics import (
     CandidateTrial,
     NormalizationConfig,
     candidate_separation,

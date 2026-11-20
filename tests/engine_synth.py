@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Synthetic case material for the engine workflow tests (no real speech, no downloads).
 
 - a subject folder with ``recordings.json``: car and phone recordings where the
@@ -72,7 +73,7 @@ def make_subject_folder(dst: Path, *, n_car: int = 4, n_phone: int = 2) -> Path:
 
 def make_evidence(dst: Path, seconds: float = 8.0) -> dict[str, Path]:
     """Evidence (local), transmitted copy and music reference."""
-    from forensicaudio.vehicle.codecs import apply_codec
+    from akoe.vehicle.codecs import apply_codec
 
     dst.mkdir(parents=True, exist_ok=True)
     n = int(seconds * SR)

@@ -1,9 +1,10 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import math
 from types import SimpleNamespace
 
 import pytest
 
-from forensicaudio.adapt.lexicon import (
+from akoe.adapt.lexicon import (
     BiasConfig,
     CaseLexicon,
     DualHypothesis,
@@ -17,7 +18,7 @@ from forensicaudio.adapt.lexicon import (
     propose_lexicon,
     word_error_rate,
 )
-from forensicaudio.models import ArtifactRef, DatasetItem, DatasetSplit, SegmentFlag
+from akoe.models import ArtifactRef, DatasetItem, DatasetSplit, SegmentFlag
 
 REF = ArtifactRef(path="/x.wav", sha256="0" * 64, kind="evidence")
 
@@ -160,7 +161,7 @@ def test_insertion_rate_measures_terms_where_absent():
 torch = pytest.importorskip("torch")
 pytest.importorskip("transformers")
 
-from forensicaudio.adapt.lexicon import (  # noqa: E402
+from akoe.adapt.lexicon import (  # noqa: E402
     LexiconBiasProcessor,
     TokenTrie,
     WhisperLexiconDecoder,

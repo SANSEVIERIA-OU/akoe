@@ -1,8 +1,10 @@
 # Master Plan
-## WHISPER — Trascrizione assistita, adattata al soggetto e al veicolo, per intercettazioni ambientali
+## Akoe — Trascrizione assistita, adattata al soggetto e al veicolo, per intercettazioni ambientali
 ### Speaker- and Channel-Adapted Transcription Support for Covert In-Vehicle Recordings: an Experimental Product
 
 Documento di lavoro e base per un paper. Riassume contesto, decisioni, stato dell'arte verificato e metodo.
+
+**Nome.** Fino al 2026-11-20 il progetto si chiamava WHISPER; è stato rinominato **Akoe** (dal greco ἀκοή, "l'udito") per non confonderlo con il modello Whisper di OpenAI che usa al suo interno. Repository: `github.com/SANSEVIERIA-OU/akoe`, sotto SANSEVIERIA License 1.1.
 
 **Revisione 2 — 2026-11-20.** Sostituisce l'impostazione del 2026-05-25 (pulizia generalista + estrazione del parlante bersaglio da miscele di voci). Le ragioni del cambio sono nella sezione 2 e nel log decisioni (sezione 9). Il censimento dei modelli fatto a maggio 2026 è conservato nell'Appendice D.
 
@@ -12,7 +14,7 @@ Documento di lavoro e base per un paper. Riassume contesto, decisioni, stato del
 
 ## Abstract
 
-WHISPER è un prodotto sperimentale open-source (modello di distribuzione non ancora deciso) che aiuta trascrittori e periti a capire cosa dice una persona registrata da una microspia. Parte dallo scenario più frequente e più trattabile: il soggetto da solo in auto, spesso in soliloquio. Invece di promettere una trascrizione "certa", il sistema combina quattro elementi: (1) un profilo del soggetto costruito da sue registrazioni reali, con un'impronta vocale discriminativa per riconoscere quando parla lui e un profilo timbrico-spettrale per separare la sua voce dal rumore; (2) un profilo acustico del veicolo, misurato o stimato; (3) un trascrittore automatico adattato a quella voce e a quel canale; (4) un risultato fatto di interpretazioni alternative con punteggi onesti, un confronto tra frasi candidate ("ha detto X o Y?") e un'autovalutazione per ogni caso. Il trascrittore umano resta l'autore della trascrizione: lavora prima alla cieca e solo dopo vede le ipotesi della macchina. L'architettura mantiene la separazione tra trattamenti riproducibili e ipotesi AI, la catena di custodia SHA-256 e tre livelli hardware (portatile senza GPU, workstation, cloud sotto controllo dell'utente), con un motore Python e un'interfaccia desktop Tauri. Le scelte si basano su una revisione della letteratura del novembre 2026. Questa mostra margini reali: in condizioni controllate i sistemi automatici battono gli ascoltatori umani, e l'adattamento al parlante dà grandi guadagni. Mostra anche lacune: non esiste nessuno studio su audio reale da microspia in auto.
+Akoe è un prodotto sperimentale open-source (modello di distribuzione non ancora deciso) che aiuta trascrittori e periti a capire cosa dice una persona registrata da una microspia. Parte dallo scenario più frequente e più trattabile: il soggetto da solo in auto, spesso in soliloquio. Invece di promettere una trascrizione "certa", il sistema combina quattro elementi: (1) un profilo del soggetto costruito da sue registrazioni reali, con un'impronta vocale discriminativa per riconoscere quando parla lui e un profilo timbrico-spettrale per separare la sua voce dal rumore; (2) un profilo acustico del veicolo, misurato o stimato; (3) un trascrittore automatico adattato a quella voce e a quel canale; (4) un risultato fatto di interpretazioni alternative con punteggi onesti, un confronto tra frasi candidate ("ha detto X o Y?") e un'autovalutazione per ogni caso. Il trascrittore umano resta l'autore della trascrizione: lavora prima alla cieca e solo dopo vede le ipotesi della macchina. L'architettura mantiene la separazione tra trattamenti riproducibili e ipotesi AI, la catena di custodia SHA-256 e tre livelli hardware (portatile senza GPU, workstation, cloud sotto controllo dell'utente), con un motore Python e un'interfaccia desktop Tauri. Le scelte si basano su una revisione della letteratura del novembre 2026. Questa mostra margini reali: in condizioni controllate i sistemi automatici battono gli ascoltatori umani, e l'adattamento al parlante dà grandi guadagni. Mostra anche lacune: non esiste nessuno studio su audio reale da microspia in auto.
 
 ---
 
@@ -43,7 +45,7 @@ Il sistema non promette di recuperare informazione che non è nel segnale. Dove 
 
 - Le intercettazioni sono regolate dagli artt. 266-271 c.p.p. (riforme: D.Lgs. 216/2017; D.L. 161/2019, conv. L. 7/2020).
 - **Art. 268, comma 7 c.p.p.**: la trascrizione delle registrazioni segue "le forme, i modi e le garanzie previsti per l'espletamento delle perizie" (testo letto su Brocardi; da verificare su Normattiva).
-- **Cassazione, Ufficio del Massimario, Relazione n. 35/2020** (23/03/2020): la trascrizione serve a rendere il contenuto "più agevolmente consultabile" e non costituisce di per sé prova, che resta la registrazione. Per WHISPER questo conta: uno strumento di supporto alla trascrizione rientra in questo quadro, purché non si presenti come fonte di prova.
+- **Cassazione, Ufficio del Massimario, Relazione n. 35/2020** (23/03/2020): la trascrizione serve a rendere il contenuto "più agevolmente consultabile" e non costituisce di per sé prova, che resta la registrazione. Per Akoe questo conta: uno strumento di supporto alla trascrizione rientra in questo quadro, purché non si presenti come fonte di prova.
 - La legge non definisce con precisione la trascrizione forense (AISV, Studi 10, 2023). Non esistono linee guida standardizzate per trascrivere le intercettazioni (Meluzzi 2025, preprint). Esiste una proposta di linee guida AISV-OLF del 2019† ed è aperto un dibattito sul carattere descrittivo o interpretativo della trascrizione (Romito 2025†, Camera penale di Catanzaro).
 - Secondo la stampa (7/9/2026), la Procura generale di Perugia ha adottato linee guida che ammettono l'AI come ausilio con verifica umana obbligatoria (testo non letto).
 - **Verifica legale: decisione del proprietario (2026-11-20).** Il software è destinato alle forze dell'ordine e il proprietario considera soddisfatta la verifica legale (issue #47 chiusa). Restano questioni distinte i termini di licenza dei modelli di terze parti (#46).
@@ -131,7 +133,7 @@ Implicazione per il prodotto: revisione cieca come impostazione predefinita. Il 
 | Tecnica | Evidenza | Limite |
 |---|---|---|
 | Adattamento del trascrittore al parlante | 71% del miglioramento con 5 min di dati (Shor et al. 2019†); 63% dei parlanti raggiunge l'obiettivo con 3-4 min, 79% con 18-20 (Tobin & Tomanek 2021†); WER mediana 4,6% contro 31% (Green et al. 2021†); un parlante disartrico con Whisper-large-v3 passa da 128% a 15,8% con 1,4 h, e LoRA di rango 8 è peggiore del fine-tuning completo del 15-39% relativo (Huber & Waibel 2026a); con microfono lontano 1 minuto di adattamento porta da 24,4% a 19,4% (van Dalen et al. 2025) | Quasi tutto su parlato atipico registrato pulito; nessuna curva minuti/errore nel rumore reale |
-| Parlato sintetico come integrazione | 21 min reali: 21,9%; con aggiunta di sintetico: 18,3% (Mihajlik et al. 2025) | Escluso per WHISPER (4.2) |
+| Parlato sintetico come integrazione | 21 min reali: 21,9%; con aggiunta di sintetico: 18,3% (Mihajlik et al. 2025) | Escluso per Akoe (4.2) |
 | Riduzione del rumore personalizzata | Errori del trascrittore: 36,4% sull'originale, 40,1% con riduzione generica, 29,6% e 25,8% con modelli personalizzati da circa 60 s di campione (Eskimez et al. 2021) | Sopprime anche parte della voce; altri studi trovano peggioramenti rispetto all'originale (arXiv 2212.00406) |
 | Simulazione del canale reale | Riverbero misurato nello stesso ambiente: 12,4% di errori, contro 77,2% addestrando su voce pulita e 16,5% con riverbero simulato (IR-GAN 2020); in abitacolo CER da 17,4% a 16,6% (CabinSep 2025) | Nessuno studio in auto che confronti canale misurato e generico; in CHiME-3 i sistemi addestrati su dati simulati peggiorano rispetto all'originale (arXiv 2205.01751) |
 | Vocabolario del caso | Errori sulle parole chiave più che dimezzati (Liu et al. 2025). ROXANNE (progetto UE per le polizie, dati simulati): F1 sui nomi da 15,4 a 20,6 in inglese e da 43,3 a 54,6 in tedesco | Inserimenti quando la parola non c'è (1.4); senza filtri, gli errori sulle altre parole passano dall'1,9% al 21,2% (Liu et al. 2025) |
@@ -152,7 +154,7 @@ Implicazione per il prodotto: revisione cieca come impostazione predefinita. Il 
 - **Fine-tuning su dati rumorosi**: risultati variabili. Sundanese a SNR negativo da 79,9% a 41,4%, ma giavanese da 100,8% a 115,0% (Pranida et al. 2025). Canary su audio telefonico: CER da 23,3% a 9,0% con simulazione di codec mu-law e rumore (Boonpramuk et al. 2026).
 - **Lacuna**: nessun confronto controllato "fine-tuning con risposta all'impulso e rumore" contro "pulizia davanti al trascrittore" su Whisper o Parakeet.
 
-**Conclusione per WHISPER.** La conoscenza della voce e del canale va dentro il trascrittore automatico (adattamento), non in un filtro davanti. La pulizia davanti al trascrittore si usa solo rimescolata con l'originale, e solo se l'autovalutazione del caso mostra che aiuta.
+**Conclusione per Akoe.** La conoscenza della voce e del canale va dentro il trascrittore automatico (adattamento), non in un filtro davanti. La pulizia davanti al trascrittore si usa solo rimescolata con l'originale, e solo se l'autovalutazione del caso mostra che aiuta.
 
 #### 3.4.2 Ricette di simulazione
 
@@ -195,7 +197,7 @@ Implicazione per il prodotto: revisione cieca come impostazione predefinita. Il 
 
 **Lacuna:** nessuno studio prova insieme un parlante noto, rumore d'auto, SNR basso e misure di intelligibilità o WER.
 
-**Conclusione per WHISPER.** La pulizia informata dal parlante dà guadagni moderati e reali soprattutto per chi ascolta. È una versione d'ascolto per il trascrittore umano, etichettata come neurale; non è l'ingresso principale del trascrittore automatico (3.4.1).
+**Conclusione per Akoe.** La pulizia informata dal parlante dà guadagni moderati e reali soprattutto per chi ascolta. È una versione d'ascolto per il trascrittore umano, etichettata come neurale; non è l'ingresso principale del trascrittore automatico (3.4.1).
 
 #### 3.5.2 Misure del timbro
 
@@ -216,7 +218,7 @@ Implicazione per il prodotto: revisione cieca come impostazione predefinita. Il 
 - **Soliloqui:** uno studio del 2025 rileva il parlato autodiretto (F1 macro 0,84, 25 partecipanti) e lo descrive come "a basso volume" e "borbottato", senza misure. Nessun dato di trascrizione automatica sul parlato autodiretto (Lee et al. 2025†).
 - **Italiano spontaneo:** su KIParla Whisper appiattisce le autocorrezioni e omette le parole brevi (Simonotti et al. 2026†).
 
-**Conclusione per WHISPER.** Il profilo timbrico va costruito **per condizione** (canale: telefono, stanza, auto; sforzo: normale, basso, alzato). Il materiale di riferimento migliore sono le registrazioni precedenti del soggetto **nella stessa auto**, una volta verificate dal trascrittore: stesso canale, stesso effetto Lombard, stesso modo di parlare da solo.
+**Conclusione per Akoe.** Il profilo timbrico va costruito **per condizione** (canale: telefono, stanza, auto; sforzo: normale, basso, alzato). Il materiale di riferimento migliore sono le registrazioni precedenti del soggetto **nella stessa auto**, una volta verificate dal trascrittore: stesso canale, stesso effetto Lombard, stesso modo di parlare da solo.
 
 ### 3.6 Interpretazioni multiple e incertezza
 
@@ -265,7 +267,7 @@ Implicazione per il prodotto: revisione cieca come impostazione predefinita. Il 
 - **Che modello serve.** Un'impronta per *riconoscere* il parlante va prodotta da un modello di verifica del parlatore (famiglie ECAPA-TDNN, ResNet di WeSpeaker, CAM++), addestrato perché registrazioni della stessa persona in condizioni diverse risultino vicine. La scelta del modello e della licenza è ancora da fare (4.2).
 - **Cosa non va confuso.** Lo "stato della voce" di Kalliope è una rappresentazione per la sintesi: imita tutto ciò che sente, compresi rumore ed eco, e non misura l'identità. Non è adatto a questo scopo.
 - **Attribuzione come prova.** Attribuire una voce a una persona come prova è materia di comparazione forense del parlatore. Le linee guida ENFSI chiedono validazione su dati tipici del caso e considerano insufficienti le cifre dei fornitori (Drygajlo et al. 2015). Il metodo spettrografico "a impronta" non è scientifico, e IAFPA (2007) ne sconsiglia l'uso nei casi reali (Morrison 2009).
-- **Ruolo in WHISPER.** L'impronta è uno strumento operativo (smistare, selezionare, avvisare), mostrato come punteggio e mai come identificazione.
+- **Ruolo in Akoe.** L'impronta è uno strumento operativo (smistare, selezionare, avvisare), mostrato come punteggio e mai come identificazione.
 
 ### 3.8 Fonetica forense: spettrogrammi e frasi contese
 
@@ -436,13 +438,13 @@ Restano le modalità FORENSIC / INVESTIGATIVE / BOTH e l'invariante `audio_prove
 
 ### 5.1 Motore e interfaccia
 
-- **Motore:** il pacchetto Python `forensicaudio` esistente, esteso. Espone un'API locale per l'interfaccia (HTTP su localhost o stdio).
+- **Motore:** il pacchetto Python `akoe` esistente, esteso. Espone un'API locale per l'interfaccia (HTTP su localhost o stdio).
 - **Interfaccia:** app desktop **Tauri** (frontend web, guscio Rust).
   - Sul portatile il motore gira come processo accanto all'app (sidecar).
   - Su workstation o cloud gira su quella macchina, e l'app vi si collega in rete cifrata.
   - L'interfaccia è la stessa su tutti i livelli.
 - **Peso:** Python con PyTorch occupa alcuni GB; i modelli si scaricano a parte, non stanno nell'installer.
-- **Perché Tauri e non Slint.** Kalliope (progetto sviluppato sulla stessa macchina, `/workspace/kalliope`) usa Slint. Per WHISPER si sceglie Tauri perché forma d'onda, spettrogramma e revisione del testo sono più semplici con tecnologie web.
+- **Perché Tauri e non Slint.** Kalliope (progetto sviluppato sulla stessa macchina, `/workspace/kalliope`) usa Slint. Per Akoe si sceglie Tauri perché forma d'onda, spettrogramma e revisione del testo sono più semplici con tecnologie web.
 
 ### 5.2 Livelli hardware
 
@@ -480,7 +482,7 @@ Si estende dai file audio a profili, adattatori, lessico e risultati dell'autova
 
 ## 6. Implementazione: stato attuale
 
-Aggiornato il 2026-11-20. Repository privato `SANSEVIERIA-OU/whisper`; dettaglio per modulo in `IMPLEMENTATION_PLAN.md` (sezioni 3 e 4) e nelle issue.
+Aggiornato il 2026-11-20. Repository privato `SANSEVIERIA-OU/akoe`; dettaglio per modulo in `IMPLEMENTATION_PLAN.md` (sezioni 3 e 4) e nelle issue.
 
 **Motore completo, collegato end-to-end** (`engine.py`, raggiungibile da API e CLI):
 - casi con reperti in sola lettura e hash, coppie locale/trasmesso, ruolo "riferimento" per il materiale del soggetto;
@@ -539,7 +541,7 @@ Due livelli: l'autovalutazione per caso (4.7) e la valutazione durante lo svilup
 9. **Nessun benchmark pubblico** su registrazioni nascoste in auto.
 10. **Licenze.** Alcuni modelli candidati sono CC-BY-NC; i pesi di Pocket TTS hanno termini sul consenso; le licenze dei modelli di verifica del parlatore sono da verificare.
 11. **Inquadramento legale:** considerato soddisfatto per decisione del proprietario (software per le forze dell'ordine, 2026-11-20); restano i termini di licenza dei modelli (#46).
-12. **Ammissibilità.** La trascrizione resta del trascrittore; WHISPER è uno strumento di supporto e la prova resta la registrazione (1.3).
+12. **Ammissibilità.** La trascrizione resta del trascrittore; Akoe è uno strumento di supporto e la prova resta la registrazione (1.3).
 
 ---
 
@@ -580,8 +582,12 @@ Due livelli: l'autovalutazione per caso (4.7) e la valutazione durante lo svilup
 | 2026-11-20 | Modello del soggetto multi-contesto: impronta e adattatore addestrati su tutte le occasioni (telefono, stanze, auto) con simulazione di canali e codec; specializzazione per condizione solo se serve | Idea guida dell'utente; l'addestramento multi-condizione è la ricetta più robusta (3.4.2) | Deciso |
 | 2026-11-20 | Microspia con registrazione locale e trasmissione: due reperti per evento; la locale è l'ingresso predefinito; la coppia serve a misurare il canale di trasmissione | Informazione dell'utente | Deciso |
 | 2026-11-20 | Codec variabili: rilevati per file e simulati in addestramento (G.711, MP3, Opus, Vorbis; AMR/GSM se c'è un encoder) | Informazione dell'utente; robustezza al codec | Deciso |
-| 2026-11-20 | Repository privato `SANSEVIERIA-OU/whisper` con roadmap (milestone M0-M8) e issue | Richiesta dell'utente | Deciso |
+| 2026-11-20 | Repository privato `SANSEVIERIA-OU/akoe` con roadmap (milestone M0-M8) e issue | Richiesta dell'utente | Deciso |
 | 2026-11-20 | Verifica legale considerata soddisfatta (#47) | Decisione del proprietario: software per le forze dell'ordine | Deciso |
+| 2026-11-20 | Progetto rinominato da WHISPER ad **Akoe**; pacchetto Python `akoe`; repository `SANSEVIERIA-OU/akoe` | Evitare la confusione con il modello Whisper di OpenAI | Deciso |
+| 2026-11-20 | Licenza SANSEVIERIA License 1.1 (LICENSE, NOTICE, THIRD_PARTY_NOTICES, CONTRIBUTING, intestazione SPDX in ogni file) | Richiesta del proprietario, come gli altri progetti SANSEVIERIA | Deciso |
+| 2026-11-20 | Criterio di scelta dei modelli: il migliore disponibile al mondo, con l'unico vincolo di girare su macchine controllate (portatile, workstation, cloud dell'utente) | Richiesta del proprietario | Deciso |
+| 2026-11-20 | Pesi pubblicati senza licenza propria in un repository con licenza dichiarata: si considerano coperti dalla licenza del repository (es. ReDimNet, MIT) | Decisione del proprietario | Deciso |
 
 ---
 
@@ -821,7 +827,7 @@ cd /workspace/WHISPER
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 python scripts/synth_test_audio.py
-python -m forensicaudio process \
+python -m akoe process \
     --evidence data/evidence.wav \
     --speaker-samples data/speaker_samples \
     --output out/case_001 \

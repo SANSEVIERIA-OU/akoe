@@ -1,0 +1,45 @@
+AKOE — LICENSING NOTICE
+
+Project: Akoe (formerly WHISPER)
+Steward: SANSEVIERIA OÜ
+Original author: Davide Briani; other authors retain their respective rights.
+Official source: https://github.com/SANSEVIERIA-OU/akoe
+Licensing contact: https://github.com/SANSEVIERIA-OU/akoe/issues
+
+The original engine, libraries, tools, tests and documentation in this source
+revision use SANSEVIERIA License 1.1, except for the separately licensed
+material below. The complete, unchanged licence is supplied as LICENSE and as
+LICENSES/LicenseRef-SANSEVIERIA-1.1.txt. LicenseRef-SANSEVIERIA-1.1 is a local
+identifier for this custom licence, not an OSI approval or SPDX-list entry.
+This licence applies to the copies and revisions expressly offered under it.
+No provision revokes any valid permissions previously granted under another
+licence, if such permissions were granted.
+
+Acceptance: this notice and the complete licence text are supplied so that they
+can be examined and retained in advance. Modifying, distributing or otherwise
+making available the covered software, enabling External Network Use of it, or
+using it in a Commercial Offering constitutes acceptance of SANSEVIERIA License
+1.1 under its section 9. Viewing the code or merely receiving a copy is not
+acceptance.
+
+Separately licensed components remain under their existing terms:
+- Third-party Python libraries and the speech models used by the engine: their
+  own terms; see THIRD_PARTY_NOTICES.md. Models are downloaded at run time and
+  are not stored in this repository.
+- The ffmpeg binary provided by imageio-ffmpeg is run as a separate program for
+  codec simulation and detection. It is not linked into or distributed with
+  Akoe.
+
+Existing copyright, licence and attribution notices must be preserved. No
+copyright assignment to the Steward is implied by this notice.
+
+Corresponding source is this version's complete source tree, including the
+instructions in CLAUDE.md, IMPLEMENTATION_PLAN.md and CONTRIBUTING.md and the
+dependency information in pyproject.toml. When distributing a binary or
+providing external network use, supply the matching source or maintain the
+source offer required by section 5; a moving branch URL alone is not a
+substitute for identifying and retaining the matching source revision.
+
+Commercial authorizations must satisfy section 7 of LICENSE. This notice is not
+such an authorization. Contributions to covered code require the express assent
+described in CONTRIBUTING.md.

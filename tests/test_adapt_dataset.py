@@ -1,8 +1,9 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import numpy as np
 import pytest
 import soundfile as sf
 
-from forensicaudio.adapt.dataset import (
+from akoe.adapt.dataset import (
     DatasetBuildError,
     ExclusionReason,
     TrainingSet,
@@ -12,9 +13,9 @@ from forensicaudio.adapt.dataset import (
     samples_sha256,
     select_items,
 )
-from forensicaudio.config import Channel, RecordingSource
-from forensicaudio.models import ArtifactRef, DatasetItem, DatasetSplit, RecordingCondition
-from forensicaudio.utils import sha256_file
+from akoe.config import Channel, RecordingSource
+from akoe.models import ArtifactRef, DatasetItem, DatasetSplit, RecordingCondition
+from akoe.utils import sha256_file
 
 PHONE = RecordingCondition(channel=Channel.PHONE, source=RecordingSource.OTHER, codec="amr-nb")
 ROOM = RecordingCondition(channel=Channel.ROOM, source=RecordingSource.OTHER)

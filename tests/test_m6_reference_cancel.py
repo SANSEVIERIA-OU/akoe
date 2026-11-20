@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Reference cancellation of radio/music (issue #32)."""
 from pathlib import Path
 
@@ -6,7 +7,7 @@ import pytest
 import soundfile as sf
 from scipy import signal
 
-from forensicaudio.stages import reference_cancel as rc
+from akoe.stages import reference_cancel as rc
 from tests import m6_synth as s
 
 SR = s.SR

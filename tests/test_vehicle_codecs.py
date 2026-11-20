@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import logging
 import subprocess
 
@@ -6,9 +7,9 @@ import pytest
 import soundfile as sf
 from scipy.signal import butter, sosfilt
 
-from forensicaudio.vehicle import codecs, ffmpeg
-from forensicaudio.vehicle.audio import estimate_lag, load_audio
-from forensicaudio.vehicle.codecs import (
+from akoe.vehicle import codecs, ffmpeg
+from akoe.vehicle.audio import estimate_lag, load_audio
+from akoe.vehicle.codecs import (
     CODEC_SPECS,
     CodecAugmenter,
     alaw_decode,

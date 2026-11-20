@@ -1,11 +1,12 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import itertools
 import os
 
 import numpy as np
 import pytest
 
-from forensicaudio.interfaces import CandidateScorer
-from forensicaudio.transcribe.ctc_scorer import (
+from akoe.interfaces import CandidateScorer
+from akoe.transcribe.ctc_scorer import (
     CTCForcedAlignmentScorer,
     ctc_min_frames,
     ctc_viterbi,
@@ -144,7 +145,7 @@ def test_local_model_load_takes_blank_from_vocab_and_hashes_weights(tmp_path):
 def test_real_ctc_model_prefers_the_spoken_sentence():
     from tests.real_audio import italian_example
 
-    model_id = os.environ.get("WHISPER_TEST_CTC_MODEL", "facebook/wav2vec2-base-10k-voxpopuli-ft-it")
+    model_id = os.environ.get("AKOE_TEST_CTC_MODEL", "facebook/wav2vec2-base-10k-voxpopuli-ft-it")
     audio, sr, text = italian_example()
     sc = CTCForcedAlignmentScorer(model_id)
     res = sc.score_detailed(audio, sr, [text, text.replace("bordo", "borgo"), "Oggi piove molto forte in montagna"])

@@ -1,8 +1,9 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import pytest
 
-from forensicaudio.config import StageKind
-from forensicaudio.models import Alternative, ConfidenceBand, SegmentFlag, SegmentHypotheses, WordHypothesis
-from forensicaudio.transcribe.combine import (
+from akoe.config import StageKind
+from akoe.models import Alternative, ConfidenceBand, SegmentFlag, SegmentHypotheses, WordHypothesis
+from akoe.transcribe.combine import (
     ABSENT,
     COMBINED_PREFIX,
     BandThresholds,

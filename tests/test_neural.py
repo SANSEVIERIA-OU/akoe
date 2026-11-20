@@ -1,7 +1,8 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import numpy as np
 import pytest
 
-from forensicaudio.neural import (
+from akoe.neural import (
     BackendUnavailable,
     ModelProvenance,
     hash_files,
@@ -10,7 +11,7 @@ from forensicaudio.neural import (
     resolve_device,
     resolve_hf_snapshot,
 )
-from forensicaudio.utils import sha256_file
+from akoe.utils import sha256_file
 
 
 def test_backend_unavailable_is_logged_as_skipped():

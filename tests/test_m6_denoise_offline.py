@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Offline noise reduction with a whole-recording noise profile (issue #30)."""
 from pathlib import Path
 
@@ -5,7 +6,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from forensicaudio.stages import denoise
+from akoe.stages import denoise
 from tests import m6_synth as s
 
 SR = s.SR

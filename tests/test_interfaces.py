@@ -1,7 +1,8 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import numpy as np
 
-from forensicaudio.config import StageKind
-from forensicaudio.interfaces import ASRBackend, CandidateScorer, VoiceprintBackend
+from akoe.config import StageKind
+from akoe.interfaces import ASRBackend, CandidateScorer, VoiceprintBackend
 from tests.fakes import FakeASR, FakeScorer, FakeVoiceprint
 
 

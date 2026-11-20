@@ -1,4 +1,4 @@
-# Implementation Plan — WHISPER
+# Implementation Plan — Akoe
 
 Documento operativo. Chiunque (umano o Claude in una sessione futura) deve poter aprire questo file e capire dove siamo, dove andiamo e perché. Contesto, evidenze e motivazioni sono in `MASTER_PLAN.md`.
 
@@ -6,7 +6,7 @@ Documento operativo. Chiunque (umano o Claude in una sessione futura) deve poter
 
 Le ricerche del 2026-11-20 sull'analisi del timbro, sul rapporto tra pulizia e trascrittore e sulle interpretazioni multiple sono integrate (`MASTER_PLAN.md`, sezioni 3.4-3.6). I punti ancora aperti sono segnati come **Da verificare**.
 
-**Repository e roadmap:** `github.com/SANSEVIERIA-OU/whisper` (privato). Le fasi M0-M8 sono milestone e i lavori sono issue; questo documento resta la descrizione di riferimento.
+**Repository e roadmap:** `github.com/SANSEVIERIA-OU/akoe` (privato). Le fasi M0-M8 sono milestone e i lavori sono issue; questo documento resta la descrizione di riferimento.
 
 **Modello del soggetto multi-contesto** (idea guida dell'utente): impronta vocale e adattatore del trascrittore si addestrano su tutte le occasioni in cui il soggetto parla (telefono, stanze, auto), con simulazione di canali, codec e sforzi vocali. L'obiettivo è riconoscerlo e interpretarne le parole indipendentemente dal contesto; l'autovalutazione misura per condizione dove ci riesce.
 
@@ -41,7 +41,7 @@ Le ricerche del 2026-11-20 sull'analisi del timbro, sul rapporto tra pulizia e t
 
 ```
 ┌──────────────────────────┐        API (HTTP locale / rete cifrata)        ┌──────────────────────────────┐
-│  App desktop Tauri       │ ─────────────────────────────────────────────▶ │  Motore Python forensicaudio │
+│  App desktop Tauri       │ ─────────────────────────────────────────────▶ │  Motore Python akoe │
 │  (frontend web, Rust)    │ ◀───────────────────────────────────────────── │  (stadi, modelli, log)       │
 └──────────────────────────┘                                                └──────────────────────────────┘
         sempre sul computer dell'operatore                     EDGE: stesso computer (sidecar)
@@ -108,7 +108,7 @@ Ogni uscita è conservata come versione immutabile per hash (`versions/`), quind
 **API e CLI:**
 - **API:** un job con avanzamento per ogni flusso; caricamento dei file nel caso; percorsi limitati alla cartella del caso o alle cartelle di import dichiarate; lettura di trascrizione, modello del soggetto, autovalutazione e registri; ascolto delle versioni con etichetta e provenienza nelle intestazioni; punteggio delle candidate sincrono con timeout.
 - **CLI:** un comando per flusso (`subject-model`, `vehicle-profile`, `clean`, `transcribe`, `candidates`, `train-adapter`, `self-assess`).
-- La pipeline di maggio (`pipeline.py`, `forensicaudio process`) resta per confronto.
+- La pipeline di maggio (`pipeline.py`, `akoe process`) resta per confronto.
 
 **Test:** 338 veloci verdi (backend finti; 1 saltato), 9 lenti (modelli reali, esclusi per impostazione predefinita). Il test lento `tests/test_engine_slow.py` porta un caso reale attraverso tutti i flussi, offline:
 - **audio:** il clip italiano di SpeechBrain inserito in rumore d'auto sintetico; 12 clip MInDS-14 it-IT come registrazioni di riferimento;
@@ -335,11 +335,11 @@ Ordine scelto: prima il cuore del prodotto (profilo del soggetto → alternative
 | `MASTER_PLAN.md` | Contesto, stato dell'arte, prodotto, decisioni, riferimenti |
 | `IMPLEMENTATION_PLAN.md` | Questo documento: fasi e criteri di completamento |
 | `pyproject.toml` | Dipendenze di base ed extra `ml` |
-| `src/forensicaudio/config.py` | `Mode`, `StageKind`, `CaseConfig`; qui va `Tier` |
-| `src/forensicaudio/models.py` | Schemi Pydantic e invariante probatorio |
-| `src/forensicaudio/pipeline.py` | Orchestratore e catena di custodia |
-| `src/forensicaudio/stages/*.py` | Stadi audio |
-| `src/forensicaudio/cli.py` | CLI di sviluppo |
+| `src/akoe/config.py` | `Mode`, `StageKind`, `CaseConfig`; qui va `Tier` |
+| `src/akoe/models.py` | Schemi Pydantic e invariante probatorio |
+| `src/akoe/pipeline.py` | Orchestratore e catena di custodia |
+| `src/akoe/stages/*.py` | Stadi audio |
+| `src/akoe/cli.py` | CLI di sviluppo |
 | `scripts/synth_test_audio.py` | Audio sintetico per i test di funzionamento |
 | `tests/test_pipeline_smoke.py` | Test end-to-end |
 

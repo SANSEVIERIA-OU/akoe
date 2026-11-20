@@ -1,8 +1,8 @@
 # Backend neurali di trascrizione e confronto tra frasi: note di verifica
 
-**Data:** 2026-11-20. Issue #12, #13, #15. **Codice:** `src/forensicaudio/transcribe/`.
+**Data:** 2026-11-20. Issue #12, #13, #15. **Codice:** `src/akoe/transcribe/`.
 
-Ogni backend registra in `ModelProvenance` (`src/forensicaudio/neural.py`):
+Ogni backend registra in `ModelProvenance` (`src/akoe/neural.py`):
 - identificativo del modello e revisione (commit Hugging Face);
 - SHA-256 di ogni file caricato, adattatori compresi;
 - dispositivo.
@@ -67,7 +67,7 @@ Non verificate le condizioni dei dati di addestramento (Common Voice, Granary).
 python3.13 -m venv /percorso/nemo-venv
 /percorso/nemo-venv/bin/pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 /percorso/nemo-venv/bin/pip install "nemo_toolkit[asr]" --extra-index-url https://download.pytorch.org/whl/cpu
-/percorso/nemo-venv/bin/pip install -e /percorso/WHISPER   # questo pacchetto
+/percorso/nemo-venv/bin/pip install -e /percorso/akoe   # questo pacchetto
 ```
 
 - **Versioni installate:** `nemo_toolkit` 3.0.0, torch 2.15.0+cpu, circa 2,2 GB su disco. Import riuscito.

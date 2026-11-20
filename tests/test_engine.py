@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Case workflows end to end with fake backends (engine.py)."""
 import json
 import stat
@@ -5,17 +6,17 @@ import stat
 import numpy as np
 import pytest
 
-from forensicaudio import engine
-from forensicaudio.adapt.artifact import load_adapter_artifact, verify_adapter
-from forensicaudio.adapt.dataset import TrainingManifest
-from forensicaudio.adapt.lexicon import CaseLexicon
-from forensicaudio.adapt.train import TrainConfig
-from forensicaudio.case import Case
-from forensicaudio.config import Channel, RecordingSource, StageKind
-from forensicaudio.models import DatasetSplit, HypothesisTranscript, ProcessingLog, RecordingCondition, SegmentFlag, SelfAssessment
-from forensicaudio.speaker.dataset import SubjectDataset
-from forensicaudio.speaker.profile import LORO_SCHEME, load_calibration
-from forensicaudio.vehicle.profile import NoiseSource
+from akoe import engine
+from akoe.adapt.artifact import load_adapter_artifact, verify_adapter
+from akoe.adapt.dataset import TrainingManifest
+from akoe.adapt.lexicon import CaseLexicon
+from akoe.adapt.train import TrainConfig
+from akoe.case import Case
+from akoe.config import Channel, RecordingSource, StageKind
+from akoe.models import DatasetSplit, HypothesisTranscript, ProcessingLog, RecordingCondition, SegmentFlag, SelfAssessment
+from akoe.speaker.dataset import SubjectDataset
+from akoe.speaker.profile import LORO_SCHEME, load_calibration
+from akoe.vehicle.profile import NoiseSource
 from tests.engine_synth import make_evidence, make_subject_folder, make_vehicle_measurements
 from tests.fakes import FakeASR, FakeProvider
 
@@ -301,7 +302,7 @@ def test_subject_model_without_verified_items_is_not_built(tmp_path):
 def test_audio_is_never_merged_with_neural_audio(built, tmp_path):
     """Investigative mode records the (unavailable) neural cleaning as skipped,
     in its own folder, and never touches the deterministic variants."""
-    from forensicaudio.config import Mode
+    from akoe.config import Mode
 
     case, ev = built["case"], built["ev"]
     before = engine.listening_index(case, ev.evidence_id)

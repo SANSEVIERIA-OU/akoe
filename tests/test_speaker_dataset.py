@@ -1,12 +1,13 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 
 import numpy as np
 import pytest
 
-from forensicaudio.case import Case
-from forensicaudio.config import Channel, RecordingSource, VocalEffort
-from forensicaudio.models import DatasetSplit, RecordingCondition
-from forensicaudio.speaker.dataset import (
+from akoe.case import Case
+from akoe.config import Channel, RecordingSource, VocalEffort
+from akoe.models import DatasetSplit, RecordingCondition
+from akoe.speaker.dataset import (
     AlignedSpan,
     DatasetError,
     QualityWarning,
@@ -32,7 +33,7 @@ def _noise_wav(path, seconds=4.0, seed=0, subtype="PCM_16"):
 
 
 def _json(path, segments, **extra):
-    path.write_text(json.dumps({"schema": "forensicaudio.transcript/v1", "segments": segments, **extra}))
+    path.write_text(json.dumps({"schema": "akoe.transcript/v1", "segments": segments, **extra}))
     return path
 
 

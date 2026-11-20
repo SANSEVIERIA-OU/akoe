@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 
 import librosa
 import numpy as np
 import pytest
 
-from forensicaudio.speaker.timbre import TimbreParams, TimbreSource, compute_timbre, third_octave_bands
+from akoe.speaker.timbre import TimbreParams, TimbreSource, compute_timbre, third_octave_bands
 from tests.synth_voice import SPEAKER_A, SPEAKER_B, SR, bandlimit, speaker_voice
 
 

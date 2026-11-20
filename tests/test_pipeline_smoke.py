@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Smoke test: forensic-mode pipeline runs end-to-end on synthetic audio.
 
 Validates plumbing only — no model quality assertions. Neural stages are
@@ -6,8 +7,8 @@ expected to be skipped (recorded in the processing log).
 import json
 from pathlib import Path
 
-from forensicaudio.config import CaseConfig, Mode
-from forensicaudio.pipeline import process
+from akoe.config import CaseConfig, Mode
+from akoe.pipeline import process
 
 
 def test_forensic_pipeline_end_to_end(tmp_path: Path) -> None:
@@ -71,7 +72,7 @@ def test_investigative_mode_skips_unimplemented_stages(tmp_path: Path) -> None:
 
 
 def test_tier_and_profile_are_recorded(tmp_path: Path) -> None:
-    from forensicaudio.config import RunProfile, Tier
+    from akoe.config import RunProfile, Tier
     from scripts.synth_test_audio import main as synth
 
     data_root = tmp_path / "data"

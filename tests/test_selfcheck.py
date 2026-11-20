@@ -1,8 +1,9 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import numpy as np
 import pytest
 import soundfile as sf
 
-from forensicaudio.assess.selfcheck import (
+from akoe.assess.selfcheck import (
     LIMITATION_HOLDOUT,
     FileAudioLoader,
     HoldoutSample,
@@ -15,9 +16,9 @@ from forensicaudio.assess.selfcheck import (
     write_self_assessment,
     write_summary,
 )
-from forensicaudio.config import Channel, RecordingSource, StageKind, VocalEffort
-from forensicaudio.interfaces import ASRBackend
-from forensicaudio.models import (
+from akoe.config import Channel, RecordingSource, StageKind, VocalEffort
+from akoe.interfaces import ASRBackend
+from akoe.models import (
     Alternative,
     ArtifactRef,
     DatasetItem,

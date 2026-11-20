@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 """Robust VAD for car noise (issue #35); the energy VAD stays unchanged."""
 import inspect
 from pathlib import Path
@@ -6,7 +7,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from forensicaudio.stages import vad
+from akoe.stages import vad
 from tests import m6_synth as s
 
 SR = s.SR

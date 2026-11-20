@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-SANSEVIERIA-1.1
 import json
 
 import numpy as np
@@ -5,12 +6,12 @@ import pytest
 import soundfile as sf
 from scipy.signal import butter, resample as fft_resample, sosfiltfilt
 
-from forensicaudio.case import Case, CaseError
-from forensicaudio.config import RecordingSource
-from forensicaudio.models import RecordingCondition
-from forensicaudio.vehicle.audio import resample, write_audio
-from forensicaudio.vehicle.codecs import apply_codec
-from forensicaudio.vehicle.pairs import PairParams, align_pair, analyze_pair, analyze_case_pair, apply_alignment
+from akoe.case import Case, CaseError
+from akoe.config import RecordingSource
+from akoe.models import RecordingCondition
+from akoe.vehicle.audio import resample, write_audio
+from akoe.vehicle.codecs import apply_codec
+from akoe.vehicle.pairs import PairParams, align_pair, analyze_pair, analyze_case_pair, apply_alignment
 from tests.vehicle_synth import car_noise, speech_like
 
 SR = 16000
