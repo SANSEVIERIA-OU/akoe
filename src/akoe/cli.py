@@ -256,6 +256,8 @@ def clean_cmd(
     subject_id: str | None = typer.Option(None, "--subject-id"),
     vehicle_id: str | None = typer.Option(None, "--vehicle-id"),
     reference: Path | None = typer.Option(None, "--reference", help="Registrazione originale della radio/musica da cancellare."),
+    neural: list[str] = typer.Option([], "--neural", help="Pulizia neurale d'ascolto (ripetibile, modalità investigative/both): unipase, mossformer2_se_48k, gtcrn, deepfilternet3, oppure 'default' per il livello."),
+    vad: str = typer.Option("robust", "--vad", help="Rilevatore di voce: robust (riproducibile, predefinito), silero, firered."),
     mode: Mode = typer.Option(Mode.FORENSIC, "--mode"),
     tier: Tier = typer.Option(Tier.EDGE, "--tier"),
     as_json: bool = typer.Option(False, "--json"),
@@ -264,7 +266,8 @@ def clean_cmd(
     from akoe import engine
 
     res = _run(engine.clean, _open_case(root), evidence_id, variants=variant or None, subject_id=subject_id,
-               vehicle_id=vehicle_id, reference=reference, mode=mode, tier=tier)
+               vehicle_id=vehicle_id, reference=reference, neural=neural or None, vad=vad, mode=mode,
+               tier=tier)
     _report(res, as_json)
 
 
@@ -278,6 +281,7 @@ def transcribe_cmd(
     subject_id: str | None = typer.Option(None, "--subject-id", help="Aggiunge il punteggio dell'impronta per segmento."),
     whisper_model: str | None = typer.Option(None, "--whisper-model"),
     n_best: int = typer.Option(5, "--n-best"),
+    vad: str = typer.Option("robust", "--vad", help="Rilevatore di voce: robust (riproducibile, predefinito), silero, firered."),
     tier: Tier = typer.Option(Tier.EDGE, "--tier"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -285,7 +289,8 @@ def transcribe_cmd(
     from akoe import engine
 
     res = _run(engine.transcribe, _open_case(root), evidence_id, pair_id=pair_id, adapter=adapter,
-               lexicon=lexicon, subject_id=subject_id, whisper_model=whisper_model, n_best=n_best, tier=tier)
+               lexicon=lexicon, subject_id=subject_id, whisper_model=whisper_model, n_best=n_best, vad=vad,
+               tier=tier)
     _report(res, as_json)
 
 

@@ -33,9 +33,22 @@ ml = [
 ml-nemo = [
     "nemo-toolkit[asr]>=2.0",
 ]
+# Neural listening enhancers (UniPASE, MossFormer2, GTCRN, DeepFilterNet 3) and
+# neural VADs (Silero, FireRedVAD); weights and model code are fetched at pinned
+# revisions with SHA-256 checks (src/akoe/stages/neural_backends.py, vad_neural.py).
+ml-listening = [
+    "onnxruntime>=1.17",
+    "omegaconf>=2.3",
+    "einops>=0.8",
+    "rotary-embedding-torch>=0.9",
+    "torchinfo>=1.8",
+    "silero-vad==6.2.3",
+    "fireredvad==0.0.2",
+]
 # Evaluation and codec simulation helpers.
 assess = [
     "jiwer>=3.0",
+    "pystoi>=0.4",
 ]
 codecs = [
     "imageio-ffmpeg>=0.5",

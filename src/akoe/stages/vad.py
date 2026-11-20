@@ -201,3 +201,49 @@ def run_robust(input_path: Path, **kwargs) -> tuple[list[tuple[float, float]], d
     segments, params = detect_speech(audio, sr, **kwargs)
     params["input_sha256"] = sha256_file(input_path)
     return segments, params
+
+
+# --------------------------------------------------------------------------
+# Common entry point: deterministic robust VAD (default) or neural VAD
+# (M6, issue #60).
+# --------------------------------------------------------------------------
+
+#: ``robust`` is the deterministic VAD above (default, forensic mode);
+#: ``silero`` and ``firered`` are neural (``akoe.stages.vad_neural``).
+VAD_METHODS = ("robust", "silero", "firered")
+DEFAULT_VAD = "robust"
+
+
+def vad_kind(method: str) -> StageKind:
+    return StageKind.DETERMINISTIC if method == "robust" else StageKind.NEURAL
+
+
+def detect_regions(
+    audio: np.ndarray,
+    sr: int,
+    *,
+    method: str = DEFAULT_VAD,
+    detector=None,
+    **params,
+) -> tuple[list[tuple[float, float]], dict]:
+    """Speech regions and parameters from the chosen VAD.
+
+    ``method="robust"`` runs :func:`detect_speech` (deterministic,
+    reproducible). ``"silero"``/``"firered"`` run a neural detector built
+    from ``params`` (or ``detector``, any object with ``name``, ``kind`` and
+    ``detect(audio, sr) -> (segments, params)``). The returned params always
+    carry ``method`` and ``kind`` (``deterministic``/``neural``).
+    """
+    if detector is not None:
+        segments, out = detector.detect(audio, sr)
+        kind = StageKind(getattr(detector, "kind", StageKind.NEURAL))
+        return segments, {**out, "method": getattr(detector, "name", method), "kind": kind.value}
+    if method not in VAD_METHODS:
+        raise ValueError(f"VAD sconosciuto: {method!r}; disponibili: {', '.join(VAD_METHODS)}")
+    if method == "robust":
+        segments, out = detect_speech(audio, sr, **params)
+        return segments, {**out, "method": "robust", "kind": StageKind.DETERMINISTIC.value}
+    from akoe.stages.vad_neural import get_detector
+
+    segments, out = get_detector(method, **params).detect(audio, sr)
+    return segments, {**out, "method": method, "kind": StageKind.NEURAL.value}
